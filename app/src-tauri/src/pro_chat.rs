@@ -168,7 +168,7 @@ fn auth_header(
     let key = std::str::from_utf8(key)
         .map_err(|_| format!("The saved {} key is invalid.", provider.name()))?;
     match provider {
-        Provider::Openai => {
+        Provider::Openai | Provider::Chatgpt => {
             let mut value = Zeroizing::new(String::with_capacity(key.len() + 7));
             value.push_str("Bearer ");
             value.push_str(key);
@@ -194,6 +194,9 @@ fn bounded_body(
 }
 
 fn provider_failure(provider: Provider, status: u16) -> String {
+    if provider == Provider::Chatgpt && status == 401 {
+        return "ChatGPT sign-in expired. Sign in again in Settings.".into();
+    }
     match status {
         401 => format!("{} rejected the saved API key.", provider.name()),
         403 => format!("{} denied this request.", provider.name()),
@@ -282,7 +285,7 @@ pub async fn provider_models(provider: Provider) -> Result<ProviderModels, Strin
     tauri::async_runtime::spawn_blocking(move || {
         let key = pro_provider::credential(provider)?;
         let endpoint = match provider {
-            Provider::Openai => OPENAI_MODELS,
+            Provider::Openai | Provider::Chatgpt => OPENAI_MODELS,
             Provider::Anthropic => ANTHROPIC_MODELS,
         };
         let (header, value) = auth_header(provider, &key)?;
@@ -382,12 +385,12 @@ fn attachment_content(
             return Err("Attachments may total no more than 20 MB per message.".into());
         }
         match (provider, attachment.media_type) {
-            (Provider::Openai, ChatAttachmentKind::Pdf) => content.push(json!({
+            (Provider::Openai | Provider::Chatgpt, ChatAttachmentKind::Pdf) => content.push(json!({
                 "type": "input_file",
                 "filename": attachment.name,
                 "file_data": format!("data:application/pdf;base64,{}", attachment.content_base64),
             })),
-            (Provider::Openai, ChatAttachmentKind::Text) => content.push(json!({
+            (Provider::Openai | Provider::Chatgpt, ChatAttachmentKind::Text) => content.push(json!({
                 "type": "input_file",
                 "filename": attachment.name,
                 "file_data": format!("data:text/plain;base64,{}", attachment.content_base64),
@@ -424,7 +427,7 @@ fn configure_thinking(provider: Provider, level: ThinkingLevel, body: &mut Value
         return;
     };
     match provider {
-        Provider::Openai => body["reasoning"] = json!({ "effort": effort }),
+        Provider::Openai | Provider::Chatgpt => body["reasoning"] = json!({ "effort": effort }),
         Provider::Anthropic => body["output_config"] = json!({ "effort": effort }),
     }
 }
@@ -490,7 +493,7 @@ fn prepare(request: &SendChatRequest) -> Result<PreparedChat, String> {
         messages.push(json!({ "role": "user", "content": current }));
     } else {
         let text_type = match request.provider {
-            Provider::Openai => "input_text",
+            Provider::Openai | Provider::Chatgpt => "input_text",
             Provider::Anthropic => "text",
         };
         attachments.push(json!({ "type": text_type, "text": current }));
@@ -503,6 +506,14 @@ fn prepare(request: &SendChatRequest) -> Result<PreparedChat, String> {
             "input": messages,
             "store": false,
             "max_output_tokens": MAX_OUTPUT_TOKENS,
+        }),
+        // Plan usage requires streaming, no stored response, and no output cap.
+        Provider::Chatgpt => json!({
+            "model": request.model,
+            "instructions": SYSTEM_PROMPT,
+            "input": messages,
+            "store": false,
+            "stream": true,
         }),
         Provider::Anthropic => json!({
             "model": request.model,
@@ -521,7 +532,7 @@ fn prepare(request: &SendChatRequest) -> Result<PreparedChat, String> {
 fn visible_text(provider: Provider, value: &Value) -> Result<(String, bool), String> {
     let mut parts = Vec::new();
     let complete = match provider {
-        Provider::Openai => {
+        Provider::Openai | Provider::Chatgpt => {
             for item in value
                 .get("output")
                 .and_then(Value::as_array)
@@ -568,19 +579,89 @@ fn visible_text(provider: Provider, value: &Value) -> Result<(String, bool), Str
     Ok((text, complete))
 }
 
+/// The final response from a streamed Responses API call: the payload of
+/// `response.completed` (or `response.incomplete`). Plan-usage errors arrive
+/// as `response.failed` events rather than HTTP statuses.
+fn streamed_response(mut response: ureq::http::Response<ureq::Body>) -> Result<Value, String> {
+    let status = response.status().as_u16();
+    if !(200..300).contains(&status) {
+        let mut body = bounded_body(&mut response, MAX_ERROR_BYTES).unwrap_or_default();
+        body.zeroize();
+        return Err(provider_failure(Provider::Chatgpt, status));
+    }
+    let limit = u64::try_from(MAX_RESPONSE_BYTES * 8)
+        .map_err(|_| "The provider response limit is invalid.".to_string())?;
+    let mut body = response
+        .body_mut()
+        .with_config()
+        .limit(limit)
+        .read_to_vec()
+        .map_err(|_| "The ChatGPT response could not be read.".to_string())?;
+    let result = final_streamed_response(&body);
+    body.zeroize();
+    result
+}
+
+/// Parse server-sent events and return the final response object.
+fn final_streamed_response(body: &[u8]) -> Result<Value, String> {
+    let text = std::str::from_utf8(body)
+        .map_err(|_| "ChatGPT returned an unreadable response.".to_string())?;
+    for line in text.lines() {
+        let Some(data) = line.strip_prefix("data:").map(str::trim) else {
+            continue;
+        };
+        let Ok(event) = serde_json::from_str::<Value>(data) else {
+            continue;
+        };
+        match event.get("type").and_then(Value::as_str) {
+            Some("response.completed" | "response.incomplete") => {
+                return event
+                    .get("response")
+                    .cloned()
+                    .ok_or_else(|| "ChatGPT returned an incomplete response.".to_string());
+            }
+            Some("response.failed" | "error") => {
+                let code = event
+                    .pointer("/response/error/code")
+                    .or_else(|| event.pointer("/error/code"))
+                    .or_else(|| event.get("code"))
+                    .and_then(Value::as_str);
+                return Err(match code {
+                    Some("subscription_sharing_usage_limit_exceeded") => {
+                        "You have reached the usage limit for Proof of Thought in your ChatGPT settings.".into()
+                    }
+                    Some("subscription_sharing_usage_unavailable") => {
+                        "ChatGPT plan usage is not available for this account right now.".into()
+                    }
+                    _ => "ChatGPT could not answer this request.".into(),
+                });
+            }
+            _ => {}
+        }
+    }
+    Err("ChatGPT ended the response before it completed.".into())
+}
+
 #[tauri::command]
 pub async fn send_provider_chat(request: SendChatRequest) -> Result<SendChatResponse, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let prepared = prepare(&request)?;
         let key = pro_provider::credential(request.provider)?;
         let endpoint = match request.provider {
-            Provider::Openai => OPENAI_RESPONSES,
+            Provider::Openai | Provider::Chatgpt => OPENAI_RESPONSES,
             Provider::Anthropic => ANTHROPIC_MESSAGES,
         };
         let (header, header_value) = auth_header(request.provider, &key)?;
         let mut provider_request = agent()
             .post(endpoint)
-            .header("accept", "application/json")
+            .header(
+                "accept",
+                if request.provider == Provider::Chatgpt {
+                    "text/event-stream"
+                } else {
+                    "application/json"
+                },
+            )
             .header(header, header_value.as_str());
         if request.provider == Provider::Anthropic {
             provider_request = provider_request.header("anthropic-version", "2023-06-01");
@@ -588,7 +669,11 @@ pub async fn send_provider_chat(request: SendChatRequest) -> Result<SendChatResp
         let response = provider_request
             .send_json(&prepared.body)
             .map_err(|_| format!("Could not reach {}.", request.provider.name()))?;
-        let value = checked_json(response, request.provider, MAX_RESPONSE_BYTES)?;
+        let value = if request.provider == Provider::Chatgpt {
+            streamed_response(response)?
+        } else {
+            checked_json(response, request.provider, MAX_RESPONSE_BYTES)?
+        };
         let (text, complete) = visible_text(request.provider, &value)?;
         let reported_model = value
             .get("model")
@@ -611,6 +696,42 @@ pub async fn send_provider_chat(request: SendChatRequest) -> Result<SendChatResp
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chatgpt_requests_stream_without_storing_or_capping_output() {
+        let prepared = prepare(&request(Provider::Chatgpt)).unwrap();
+        assert_eq!(prepared.body["stream"], json!(true));
+        assert_eq!(prepared.body["store"], json!(false));
+        assert!(prepared.body.get("max_output_tokens").is_none());
+        assert!(prepared.body["instructions"].is_string());
+    }
+
+    #[test]
+    fn streamed_responses_return_the_completed_payload() {
+        let body = concat!(
+            "event: response.output_text.delta\n",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hi\"}\n\n",
+            "event: response.completed\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",",
+            "\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hi there\"}]}]}}\n\n",
+        );
+        let value = final_streamed_response(body.as_bytes()).unwrap();
+        assert_eq!(
+            visible_text(Provider::Chatgpt, &value).unwrap(),
+            ("Hi there".into(), true)
+        );
+    }
+
+    #[test]
+    fn streamed_usage_limits_explain_themselves() {
+        let body = "data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"subscription_sharing_usage_limit_exceeded\"}}}\n";
+        assert!(
+            final_streamed_response(body.as_bytes())
+                .unwrap_err()
+                .contains("usage limit")
+        );
+        assert!(final_streamed_response(b"data: {\"type\":\"response.created\"}\n").is_err());
+    }
 
     fn request(provider: Provider) -> SendChatRequest {
         SendChatRequest {

@@ -15,6 +15,7 @@ use std::{
 use tauri_plugin_dialog::DialogExt;
 use thoughtd::discovery::{self, Daemon};
 
+mod chatgpt_account;
 #[cfg(target_os = "macos")]
 mod macos_secure_input;
 #[cfg(target_os = "macos")]
@@ -897,7 +898,8 @@ pub fn run() {
             pro_chat::send_provider_chat,
             pro_provider::provider_configurations,
             pro_provider::configure_provider_key,
-            pro_provider::remove_provider_key
+            pro_provider::remove_provider_key,
+            pro_provider::cancel_chatgpt_sign_in
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
