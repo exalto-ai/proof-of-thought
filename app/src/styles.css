@@ -201,10 +201,9 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   cursor: default;
   transition: background 200ms ease;
 }
-.status:hover { box-shadow: 0 0 0 3px var(--raised); }
-.status[data-state="connected"] { background: var(--status-positive); }
 .status[data-state="connecting"] { background: var(--status-caution); }
 .status[data-state="offline"] { background: var(--status-negative); }
+.status[hidden] { display: none; }
 .panel-toggle {
   position: fixed;
   top: calc((var(--chrome-height) - 26px) / 2);
@@ -827,40 +826,6 @@ body.settings-page {
   overflow-wrap: anywhere;
 }
 
-/* ---------- connections popover ---------- */
-.popover {
-  position: fixed;
-  top: calc(var(--chrome-height) - 4px);
-  right: 12px;
-  z-index: 30;
-  width: 320px;
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-  padding: 4px 0 8px;
-  font-size: 12.5px;
-}
-.popover[hidden] { display: none; }
-.popover section { padding: 8px 14px; }
-.popover section + section { border-top: 1px solid var(--rule); }
-.popover h2 {
-  font-size: 10.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--ink-faint);
-  margin: 0 0 6px;
-}
-.popover ul { list-style: none; margin: 0 0 6px; padding: 0; }
-.popover li { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
-.popover .dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--who); flex-shrink: 0;
-}
-.popover .name { color: var(--ink); }
-.popover .meta { margin-left: auto; color: var(--ink-faint); font-size: 11px; }
-.popover .none { color: var(--ink-faint); padding: 2px 0; }
 .ghost {
   font: inherit;
   font-size: 11.5px;

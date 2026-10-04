@@ -973,11 +973,19 @@ app-wide Settings window (Proof of Thought → Settings…, ⌘,) offers Auto (f
 Light, and Dark. A compact, centered toolbar, floating at the top or bottom of the editor as
 Settings chooses, provides New, local zoom, persistent block style, font
 size, bold, italic, and link commands. Clicking linked text opens an action card with
-explicit open, copy, edit, and remove commands instead of navigating immediately. ⌘N,
+explicit open, copy, edit, and remove commands instead of navigating immediately. ⌘T,
 New, and Markdown import create a document and open it in the current window, as Notes does,
 after the same autosave check as switching documents; the documents sidebar lists every
-document, so a new one is never lost behind the current editor. The Connections popover's
-New document window still opens a separate, visibly cascaded window.
+document, so a new one is never lost behind the current editor. ⌘N opens the current document
+in another, visibly cascaded window (macOS may show it as a tab, per the system's "Prefer tabs"
+setting), as does a note's Open in New Window.
+
+The title bar shows the daemon connection only when it needs attention (connecting or
+offline); a connected window shows nothing. **Amended:** a status dot used to open a
+Connections popover listing this document's windows and agent editors with a New document
+window button. The windows duplicated the presence chips beside it, the agent history
+duplicated Sources, and the button no longer did what it said. **Cost:** the per-agent edit
+counts it showed are no longer in the window; the op log still has them.
 
 **Amended:** New used to open every document in its own window so it never replaced the
 editor in use. With a documents sidebar that is no longer needed to keep work reachable, and it

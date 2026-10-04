@@ -49,9 +49,6 @@ const els = {
   presence: document.getElementById("presence")!,
   editor: document.getElementById("editor")!,
   scrim: document.getElementById("scrim")!,
-  connections: document.getElementById("connections")!,
-  peers: document.getElementById("peers")!,
-  agents: document.getElementById("agents")!,
   toast: document.getElementById("toast")!,
   switcher: document.querySelector(".switcher") as HTMLElement,
   hint: document.getElementById("switcher-hint")!,
@@ -154,7 +151,6 @@ const activeAgents = new Map<string, { presence: AgentPresence; at: number }>();
 function noteAgent(presence: AgentPresence) {
   activeAgents.set(presence.actor_id, { presence, at: Date.now() });
   renderPeers();
-  if (!els.connections.hidden) void refreshConnectionActors();
   scheduleProvenance();
   // Re-render when this one lapses, so the chip disappears without a further
   // edit to trigger it.
@@ -169,9 +165,16 @@ function liveAgents() {
   return [...activeAgents.values()];
 }
 
+/** Shown only when the daemon connection needs attention; silent when connected. */
+const STATUS_TITLES: Partial<Record<ProviderStatus, string>> = {
+  connecting: "Connecting to the daemon…",
+  offline: "Offline — edits will sync when the daemon is back",
+};
+
 function setStatus(status: ProviderStatus) {
   els.status.dataset.state = status;
-  els.status.title = status;
+  els.status.title = STATUS_TITLES[status] ?? "";
+  els.status.hidden = !STATUS_TITLES[status];
 }
 
 /**
@@ -234,7 +237,6 @@ function pointAt(peerId: number, pointed: boolean) {
 function renderPeers() {
   if (!open) return;
   renderPresence(open.awareness, open.doc.clientID);
-  if (!els.connections.hidden) renderConnectionPeers();
 }
 
 /**
@@ -443,7 +445,7 @@ function scheduleProvenance() {
   provenanceTimer = window.setTimeout(() => void refreshProvenance(), PROVENANCE_DEBOUNCE_MS);
 }
 
-// ---------------------------------------------------------------- connections
+// ---------------------------------------------------------------- presence
 
 function ago(timestamp: number): string {
   const seconds = Math.max(0, (Date.now() - timestamp) / 1000);
@@ -453,102 +455,6 @@ function ago(timestamp: number): string {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-function row(color: string, name: string, meta: string): HTMLLIElement {
-  const item = document.createElement("li");
-  const dot = document.createElement("span");
-  dot.className = "dot";
-  dot.style.setProperty("--who", color);
-  const label = document.createElement("span");
-  label.className = "name";
-  label.textContent = name;
-  const detail = document.createElement("span");
-  detail.className = "meta";
-  detail.textContent = meta;
-  item.append(dot, label, detail);
-  return item;
-}
-
-function agentLabel(a: { display_name: string; model: string | null; actor_id: string }) {
-  const name = a.display_name.trim() || playfulName(seedFrom(a.actor_id));
-  return a.model ? `${name} · ${a.model}` : name;
-}
-
-function empty(text: string): HTMLLIElement {
-  const item = document.createElement("li");
-  item.className = "none";
-  item.textContent = text;
-  return item;
-}
-
-function renderConnectionPeers() {
-  if (!open) return;
-  const { awareness, doc } = open;
-
-  // Windows are *present* — awareness is live and never persisted.
-  const peers = [...awareness.getStates().entries()];
-  els.peers.replaceChildren(
-    ...peers.map(([id, state]) => {
-      const user = (state as { user?: { name: string; color: string } }).user;
-      return row(
-        user?.color ?? FALLBACK_PRESENCE_COLOR,
-        user?.name ?? "Someone",
-        id === doc.clientID ? "this window" : "connected",
-      );
-    }),
-  );
-  if (peers.length === 0) els.peers.replaceChildren(empty("Not connected"));
-}
-
-async function refreshConnectionActors() {
-  if (!open) return;
-  const docId = openDocId;
-  // Agents have *edited* — they come in over MCP, which carries no presence,
-  // so this is history from the op log rather than who is attached right now.
-  try {
-    const actors = await mcp.documentActors(docId);
-    if (!open || openDocId !== docId || els.connections.hidden) return;
-    const agents = actors.filter((a) => a.kind === "agent");
-    els.agents.replaceChildren(
-      ...agents.map((a) =>
-        row(
-          // Fall back to a playful name only when a client sent none; renaming
-          // something the user named would be worse than the problem.
-          a.color || colorFor(seedFrom(a.actor_id)),
-          agentLabel(a),
-          `${a.edits} edit${a.edits === 1 ? "" : "s"} · ${ago(a.last_seen)}`,
-        ),
-      ),
-    );
-    if (agents.length === 0) {
-      els.agents.replaceChildren(empty("No agent has edited this document"));
-    }
-  } catch {
-    els.agents.replaceChildren(empty("Could not reach the daemon"));
-  }
-}
-
-function toggleConnections(force?: boolean) {
-  const show = force ?? els.connections.hidden;
-  els.connections.hidden = !show;
-  if (show) {
-    renderConnectionPeers();
-    void refreshConnectionActors();
-  }
-}
-
-document.getElementById("status")!.addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleConnections();
-});
-document.addEventListener("mousedown", (e) => {
-  if (!els.connections.hidden && !els.connections.contains(e.target as Node)) {
-    toggleConnections(false);
-  }
-});
-document.getElementById("new-window")!.addEventListener("click", () => {
-  toggleConnections(false);
-  void createNewDocument();
-});
 // ---------------------------------------------------------------- switcher
 
 let results: DocumentSummary[] = [];
@@ -722,7 +628,6 @@ async function createDocumentHere(title: string) {
   try {
     const created = await editorApi.createDocument(title);
     els.scrim.hidden = true;
-    toggleConnections(false);
     await openDocument(created.doc_id);
     void docSidebar.refresh();
   } catch (error) {
@@ -746,7 +651,6 @@ async function showDocumentHere(docId: string): Promise<void> {
 
 async function importMarkdownFile() {
   els.scrim.hidden = true;
-  toggleConnections(false);
   try {
     const file = await importMarkdownDocument(
       nativeFileBridge,
@@ -785,14 +689,15 @@ async function exportMarkdownFile(target = open): Promise<boolean> {
 // ---------------------------------------------------------------- keys
 
 document.addEventListener("keydown", (event) => {
-  if (
-    accel(event) &&
-    !event.shiftKey &&
-    !event.altKey &&
-    event.key.toLowerCase() === "n"
-  ) {
+  // ⌘T: a new note here, like a new tab. ⌘N: another window on this note.
+  if (accel(event) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "t") {
     event.preventDefault();
     void createNewDocument();
+    return;
+  }
+  if (accel(event) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "n") {
+    event.preventDefault();
+    if (openDocId) void openInNewWindow(openDocId);
     return;
   }
   if (

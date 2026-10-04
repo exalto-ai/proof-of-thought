@@ -17,18 +17,6 @@
     <button class="panel-toggle" id="doc-sidebar-toggle" type="button" aria-controls="doc-sidebar" aria-expanded="false" aria-label="documents sidebar" title="Show documents sidebar"></button>
     <button class="panel-toggle" id="ai-support-toggle" type="button" aria-controls="ai-support-sidebar" aria-expanded="false" aria-label="AI sidebar" title="Show AI sidebar"></button>
 
-    <div class="popover" id="connections" hidden role="dialog" aria-label="Connections">
-      <section>
-        <h2>Windows</h2>
-        <ul id="peers"></ul>
-        <button class="ghost" id="new-window">New document window</button>
-      </section>
-      <section>
-        <h2>Agents</h2>
-        <ul id="agents"></ul>
-      </section>
-    </div>
-
     <div class="workspace">
       <aside class="side-panel doc-sidebar" id="doc-sidebar" data-side-panel aria-label="Documents" tabindex="-1" hidden>
         <div class="titlebar" data-tauri-drag-region></div>
@@ -46,7 +34,7 @@
       <div class="main-column">
         <header class="chrome titlebar" data-tauri-drag-region>
           <span class="presence" id="presence"></span>
-          <button class="status" id="status" title="Connections" aria-haspopup="dialog"></button>
+          <span class="status" id="status" role="status" hidden></span>
         </header>
         <main class="page">
           <div id="editor" class="editor"></div>
