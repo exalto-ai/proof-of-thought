@@ -49,6 +49,16 @@ reported by the client and is not provider-verified.
 Markdown and find/replace input are converted to normalized ProseMirror nodes at proposal
 time. Acceptance does not parse or search again.
 
+## Groups
+
+A proposal may carry a group (`{ id, label }`) naming the change it belongs to, so a rewrite made
+of several edits is decided once. `/editor/documents/{id}/suggestion-groups/{group}/accept`
+applies every pending member, in the order proposed, as one CRDT update. A member whose
+replacement changed a block's type, and so its id, is followed by later members that name the
+old id. If any member is stale, nothing is applied: a group is one decision, and accepting part
+of it could leave the note half rewritten. `/reject` rejects every pending member. Built-in chat
+sets groups; MCP reviewers do not yet.
+
 ## Stale proposals
 
 A proposal records a digest of the blocks it addresses: the replaced or deleted block's id and

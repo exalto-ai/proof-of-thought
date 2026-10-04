@@ -8,8 +8,8 @@ mod tree;
 
 pub use block::{BlockError, BlockRef, Position};
 pub use suggestion::{
-    SuggestionBlockPosition, SuggestionDecision, SuggestionPatch, SuggestionProposer,
-    SuggestionRecord, SuggestionRecordError, SuggestionState,
+    SuggestionBlockPosition, SuggestionDecision, SuggestionGroup, SuggestionPatch,
+    SuggestionProposer, SuggestionRecord, SuggestionRecordError, SuggestionState,
 };
 
 use thought_schema::Node;

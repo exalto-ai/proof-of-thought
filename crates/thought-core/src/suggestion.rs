@@ -49,6 +49,14 @@ pub enum SuggestionBlockPosition {
     Block { block_id: String },
 }
 
+/// Suggestions the proposer wants decided together, such as every edit of
+/// one rewrite. Accepting or rejecting one member decides them all.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SuggestionGroup {
+    pub id: String,
+    pub label: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SuggestionState {
@@ -80,6 +88,8 @@ pub struct SuggestionRecord {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_target_revision: Option<String>,
     pub patch: SuggestionPatch,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<SuggestionGroup>,
     pub explanation: Option<String>,
     pub state: SuggestionState,
     pub decision: Option<SuggestionDecision>,
@@ -202,6 +212,7 @@ mod tests {
             patch: SuggestionPatch::DeleteBlock {
                 block_id: "1:0".into(),
             },
+            group: None,
             explanation: Some("Tighter wording".into()),
             state: SuggestionState::Pending,
             decision: None,

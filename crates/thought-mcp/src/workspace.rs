@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use thought_core::{
-    BlockError, Document, Position, SuggestionBlockPosition, SuggestionDecision, SuggestionPatch,
-    SuggestionProposer, SuggestionRecord, SuggestionRecordError, SuggestionState,
+    BlockError, Document, Position, SuggestionBlockPosition, SuggestionDecision, SuggestionGroup,
+    SuggestionPatch, SuggestionProposer, SuggestionRecord, SuggestionRecordError, SuggestionState,
 };
 use thought_markdown::{from_markdown, to_markdown_with_spans};
 use thought_provenance::{
@@ -543,8 +543,12 @@ impl Workspace {
         connection_id: &str,
         actor: &ActorRef,
         context: &MutationContext,
+        group: Option<SuggestionGroup>,
     ) -> Result<SuggestionOutcome, WorkspaceError> {
         validate_suggestion_request(request_id, explanation)?;
+        if let Some(group) = &group {
+            validate_group(group)?;
+        }
         let suggestion_id = format!("{connection_id}:{request_id}");
         self.with(|inner| {
             let current = inner.doc(doc_id)?;
@@ -581,6 +585,7 @@ impl Workspace {
                 base_content_revision: actual_revision.clone(),
                 base_target_revision,
                 patch,
+                group,
                 explanation: explanation.map(str::to_string),
                 state: SuggestionState::Pending,
                 decision: None,
@@ -678,6 +683,100 @@ impl Workspace {
                 content_revision: content_revision(inner.doc(doc_id)?),
                 suggestion: accepted,
             })
+        })
+    }
+
+    /// Accept every pending suggestion in a group as one change. If any of
+    /// them is stale, none is applied: a group is one decision.
+    pub fn accept_suggestion_group(
+        &self,
+        doc_id: &str,
+        group_id: &str,
+        decided_by: &ActorRef,
+    ) -> Result<Vec<SuggestionRecord>, WorkspaceError> {
+        self.with(|inner| {
+            let current = inner.doc(doc_id)?;
+            let members = pending_group(current, doc_id, group_id)?;
+            let revision = content_revision(current);
+            if let Some(stale) = members
+                .iter()
+                .find(|member| !is_current(member, current, &revision))
+            {
+                return Err(SuggestionError::BaseRevisionMismatch {
+                    expected: stale.base_content_revision.clone(),
+                    actual: revision,
+                }
+                .into());
+            }
+            let first = &members[0];
+            let proposer = ActorRef::reviewer(
+                &first.proposer.connection_id,
+                &first.proposer.label,
+                first.proposer.reported_model.as_deref(),
+                first.proposer.session_id.as_deref(),
+            );
+            let context = MutationContext::suggestion(
+                format!("Suggestion from {}", first.proposer.label),
+                &first.proposer.connection_id,
+            );
+            let decided_at = now_ms();
+            let (accepted, _) = inner.mutate(doc_id, &proposer, &context, |candidate| {
+                // A replacement that changes a block's type gives it a new
+                // id; later members may still name the old one.
+                let mut renamed = HashMap::<String, String>::new();
+                let mut accepted = Vec::with_capacity(members.len());
+                for member in &members {
+                    let patch = rename_patch(&member.patch, &renamed);
+                    if let Some((old, new)) = apply_patch_tracking(candidate, &patch)? {
+                        renamed.insert(old, new);
+                    }
+                    let mut decided = member.clone();
+                    decided.state = SuggestionState::Accepted;
+                    decided.decision = Some(SuggestionDecision {
+                        actor_id: decided_by.id.clone(),
+                        actor_label: decided_by.display_name.clone(),
+                        decided_at,
+                    });
+                    candidate.put_suggestion(&decided)?;
+                    accepted.push(decided);
+                }
+                Ok(accepted)
+            })?;
+            Ok(accepted)
+        })
+    }
+
+    /// Reject every pending suggestion in a group. Stale members are
+    /// rejected too; rejection never changes wording.
+    pub fn reject_suggestion_group(
+        &self,
+        doc_id: &str,
+        group_id: &str,
+        decided_by: &ActorRef,
+    ) -> Result<Vec<SuggestionRecord>, WorkspaceError> {
+        self.with(|inner| {
+            let members = pending_group(inner.doc(doc_id)?, doc_id, group_id)?;
+            let decided_at = now_ms();
+            let rejected = members
+                .into_iter()
+                .map(|mut member| {
+                    member.state = SuggestionState::Rejected;
+                    member.decision = Some(SuggestionDecision {
+                        actor_id: decided_by.id.clone(),
+                        actor_label: decided_by.display_name.clone(),
+                        decided_at,
+                    });
+                    member
+                })
+                .collect::<Vec<_>>();
+            let stored = rejected.clone();
+            inner.mutate_metadata(doc_id, decided_by, |candidate| {
+                for member in &stored {
+                    candidate.put_suggestion(member)?;
+                }
+                Ok(())
+            })?;
+            Ok(rejected)
         })
     }
 
@@ -1812,6 +1911,100 @@ fn apply_suggestion_patch(doc: &Document, patch: &SuggestionPatch) -> Result<(),
         SuggestionPatch::DeleteBlock { block_id } => doc.delete_block(block_id)?,
     }
     Ok(())
+}
+
+const MAX_GROUP_ID_BYTES: usize = 160;
+const MAX_GROUP_LABEL_BYTES: usize = 200;
+
+fn validate_group(group: &SuggestionGroup) -> Result<(), WorkspaceError> {
+    let id_ok = !group.id.is_empty()
+        && group.id.len() <= MAX_GROUP_ID_BYTES
+        && group
+            .id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | ':'));
+    let label_ok = !group.label.trim().is_empty()
+        && group.label.len() <= MAX_GROUP_LABEL_BYTES
+        && !group.label.chars().any(char::is_control);
+    if id_ok && label_ok {
+        Ok(())
+    } else {
+        Err(SuggestionError::InvalidInput("invalid suggestion group".into()).into())
+    }
+}
+
+/// A group's pending members in the order they were proposed.
+fn pending_group(
+    doc: &Document,
+    doc_id: &str,
+    group_id: &str,
+) -> Result<Vec<SuggestionRecord>, WorkspaceError> {
+    let members = doc
+        .suggestions()?
+        .into_iter()
+        .filter(|suggestion| {
+            suggestion.state == SuggestionState::Pending
+                && suggestion
+                    .group
+                    .as_ref()
+                    .is_some_and(|group| group.id == group_id)
+        })
+        .collect::<Vec<_>>();
+    if members.is_empty() {
+        return Err(SuggestionError::NotFound(group_id.to_string()).into());
+    }
+    for member in &members {
+        validate_pending_suggestion(member, doc_id)?;
+    }
+    Ok(members)
+}
+
+fn rename_patch(patch: &SuggestionPatch, renamed: &HashMap<String, String>) -> SuggestionPatch {
+    let name = |id: &String| renamed.get(id).cloned().unwrap_or_else(|| id.clone());
+    match patch {
+        SuggestionPatch::ReplaceBlock { block_id, nodes } => SuggestionPatch::ReplaceBlock {
+            block_id: name(block_id),
+            nodes: nodes.clone(),
+        },
+        SuggestionPatch::ReplaceText { block_id, nodes } => SuggestionPatch::ReplaceText {
+            block_id: name(block_id),
+            nodes: nodes.clone(),
+        },
+        SuggestionPatch::DeleteBlock { block_id } => SuggestionPatch::DeleteBlock {
+            block_id: name(block_id),
+        },
+        SuggestionPatch::InsertBlocks { after, nodes } => SuggestionPatch::InsertBlocks {
+            after: match after {
+                SuggestionBlockPosition::Block { block_id } => SuggestionBlockPosition::Block {
+                    block_id: name(block_id),
+                },
+                other => other.clone(),
+            },
+            nodes: nodes.clone(),
+        },
+    }
+}
+
+/// Apply one patch, returning a block's old and new id when replacing it
+/// changed its id.
+fn apply_patch_tracking(
+    doc: &Document,
+    patch: &SuggestionPatch,
+) -> Result<Option<(String, String)>, WorkspaceError> {
+    if let SuggestionPatch::ReplaceBlock { block_id, nodes }
+    | SuggestionPatch::ReplaceText { block_id, nodes } = patch
+    {
+        let Some(first) = nodes.first() else {
+            return Err(SuggestionError::CorruptStored("replacement has no blocks".into()).into());
+        };
+        let replaced = doc.replace_block(block_id, first)?;
+        if nodes.len() > 1 {
+            doc.insert_blocks(&Position::After(replaced.block_id.clone()), &nodes[1..])?;
+        }
+        return Ok((replaced.block_id != *block_id).then(|| (block_id.clone(), replaced.block_id)));
+    }
+    apply_suggestion_patch(doc, patch)?;
+    Ok(None)
 }
 
 fn validate_pending_suggestion(

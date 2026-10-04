@@ -367,6 +367,7 @@ impl Thought {
                 &connection_id,
                 &actor,
                 &context,
+                None,
             )
             .map_err(failed)?;
         Ok(Json(serde_json::to_value(outcome).map_err(failed)?))

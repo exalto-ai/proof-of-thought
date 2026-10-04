@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use std::sync::Arc;
-use thought_core::Position;
+use thought_core::{Position, SuggestionGroup};
 use thought_mcp::{
     ActorRef, MutationContext, ReviewerAccess, ReviewerClient, SuggestedChange, Workspace,
 };
@@ -49,6 +49,9 @@ struct CreateChatSuggestion {
     #[serde(default)]
     reported_model: Option<String>,
     change: ChatChange,
+    /// The change this edit belongs to, decided as one with the others in it.
+    #[serde(default)]
+    group: Option<SuggestionGroup>,
 }
 
 /// One edit a chat model made with its tools. Edits to an existing block
@@ -126,6 +129,14 @@ pub fn routes(workspace: Arc<Workspace>, reviewers: Arc<ConnectionRegistry>) -> 
         .route(
             "/editor/documents/{doc_id}/edits/pro-chat",
             post(apply_chat_edit),
+        )
+        .route(
+            "/editor/documents/{doc_id}/suggestion-groups/{group_id}/accept",
+            post(accept_suggestion_group),
+        )
+        .route(
+            "/editor/documents/{doc_id}/suggestion-groups/{group_id}/reject",
+            post(reject_suggestion_group),
         )
         .route(
             "/editor/documents/{doc_id}/suggestions/{suggestion_id}/accept",
@@ -317,6 +328,7 @@ async fn create_chat_suggestion(
     Json(request): Json<CreateChatSuggestion>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let request_id = request.request_id.clone();
+    let group = request.group.clone();
     let (change, author) = checked_chat_change(&state, &doc_id, request)?;
     let current = state.workspace.read_document(&doc_id).map_err(failed)?;
     let context = MutationContext::mcp_connection(author.label.clone(), &author.connection_id);
@@ -332,6 +344,7 @@ async fn create_chat_suggestion(
             &author.connection_id,
             &author.actor,
             &context,
+            group,
         )
         .map_err(|error| match error {
             thought_mcp::WorkspaceError::Block(_) => edit_changed(),
@@ -396,6 +409,28 @@ async fn accept_suggestion(
         .accept_suggestion(&doc_id, &suggestion_id, &ActorRef::editor())
         .map_err(failed)?;
     Ok(Json(serde_json::to_value(outcome).map_err(failed)?))
+}
+
+async fn accept_suggestion_group(
+    State(state): State<EditorState>,
+    Path((doc_id, group_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let suggestions = state
+        .workspace
+        .accept_suggestion_group(&doc_id, &group_id, &ActorRef::editor())
+        .map_err(failed)?;
+    Ok(Json(serde_json::json!({ "suggestions": suggestions })))
+}
+
+async fn reject_suggestion_group(
+    State(state): State<EditorState>,
+    Path((doc_id, group_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let suggestions = state
+        .workspace
+        .reject_suggestion_group(&doc_id, &group_id, &ActorRef::editor())
+        .map_err(failed)?;
+    Ok(Json(serde_json::json!({ "suggestions": suggestions })))
 }
 
 async fn reject_suggestion(

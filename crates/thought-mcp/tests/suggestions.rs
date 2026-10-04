@@ -38,6 +38,7 @@ fn propose_replace(
             "reviewer-one",
             &actor,
             &context,
+            None,
         )
         .unwrap()
 }
@@ -238,4 +239,136 @@ fn rejection_and_proposals_survive_a_cold_start() {
     assert_eq!(suggestions.len(), 1);
     assert_eq!(suggestions[0].suggestion_id, suggestion_id);
     assert_eq!(suggestions[0].state, SuggestionState::Rejected);
+}
+
+fn propose_in_group(
+    workspace: &Workspace,
+    doc_id: &str,
+    request_id: &str,
+    change: SuggestedChange,
+) -> thought_mcp::SuggestionOutcome {
+    let (actor, context) = reviewer();
+    let revision = workspace.read_document(doc_id).unwrap().content_revision;
+    workspace
+        .propose_suggestion(
+            doc_id,
+            request_id,
+            &revision,
+            &change,
+            None,
+            None,
+            "reviewer-one",
+            &actor,
+            &context,
+            Some(thought_core::SuggestionGroup {
+                id: "rewrite-1".into(),
+                label: "Tighten the draft".into(),
+            }),
+        )
+        .unwrap()
+}
+
+#[test]
+fn a_group_is_accepted_as_one_change_even_when_a_block_changes_type() {
+    let workspace = Workspace::open_in_memory().unwrap();
+    let document = workspace
+        .create_document_from_markdown("", "First\n\nSecond", &ActorRef::editor())
+        .unwrap();
+    let first = document.blocks[0].block_id.clone();
+    let second = document.blocks[1].block_id.clone();
+    // A paragraph becomes a heading (a new block id), then content goes after it.
+    propose_in_group(
+        &workspace,
+        &document.doc_id,
+        "r1",
+        SuggestedChange::ReplaceBlock {
+            block_id: first.clone(),
+            markdown: "# Title".into(),
+        },
+    );
+    propose_in_group(
+        &workspace,
+        &document.doc_id,
+        "r2",
+        SuggestedChange::InsertBlocks {
+            after: Some(first),
+            markdown: "Intro".into(),
+        },
+    );
+    propose_in_group(
+        &workspace,
+        &document.doc_id,
+        "r3",
+        SuggestedChange::DeleteBlock { block_id: second },
+    );
+
+    let accepted = workspace
+        .accept_suggestion_group(&document.doc_id, "rewrite-1", &ActorRef::editor())
+        .unwrap();
+    assert_eq!(accepted.len(), 3);
+    assert!(
+        accepted
+            .iter()
+            .all(|s| s.state == SuggestionState::Accepted)
+    );
+    assert_eq!(
+        workspace.read_document(&document.doc_id).unwrap().markdown,
+        "# Title\n\nIntro"
+    );
+}
+
+#[test]
+fn a_stale_member_blocks_the_group_but_rejection_still_works() {
+    let workspace = Workspace::open_in_memory().unwrap();
+    let document = workspace
+        .create_document_from_markdown("", "First\n\nSecond", &ActorRef::editor())
+        .unwrap();
+    let first = document.blocks[0].block_id.clone();
+    let second = document.blocks[1].block_id.clone();
+    propose_in_group(
+        &workspace,
+        &document.doc_id,
+        "r1",
+        SuggestedChange::ReplaceBlock {
+            block_id: first,
+            markdown: "One".into(),
+        },
+    );
+    propose_in_group(
+        &workspace,
+        &document.doc_id,
+        "r2",
+        SuggestedChange::ReplaceBlock {
+            block_id: second.clone(),
+            markdown: "Two".into(),
+        },
+    );
+    workspace
+        .replace_block(
+            &document.doc_id,
+            &second,
+            "Edited by hand",
+            None,
+            &ActorRef::editor(),
+        )
+        .unwrap();
+
+    assert!(matches!(
+        workspace.accept_suggestion_group(&document.doc_id, "rewrite-1", &ActorRef::editor()),
+        Err(WorkspaceError::Suggestion(
+            SuggestionError::BaseRevisionMismatch { .. }
+        ))
+    ));
+    assert_eq!(
+        workspace.read_document(&document.doc_id).unwrap().markdown,
+        "First\n\nEdited by hand"
+    );
+    let rejected = workspace
+        .reject_suggestion_group(&document.doc_id, "rewrite-1", &ActorRef::editor())
+        .unwrap();
+    assert_eq!(rejected.len(), 2);
+    assert!(matches!(
+        workspace.accept_suggestion_group(&document.doc_id, "rewrite-1", &ActorRef::editor()),
+        Err(WorkspaceError::Suggestion(SuggestionError::NotFound(_)))
+    ));
 }
