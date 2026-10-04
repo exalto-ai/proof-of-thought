@@ -6,8 +6,10 @@ import {
   currentBlockStyle,
   installToolbar,
   safeZoom,
+  ZOOM_COMMAND_EVENT,
   type BlockStyle,
   type ToolbarOptions,
+  type ZoomCommand,
 } from "./toolbar";
 
 const editors: Editor[] = [];
@@ -260,6 +262,30 @@ describe("installed toolbar", () => {
     expect(document.querySelector('[aria-label="Import Markdown file"]')).toBeNull();
     expect(document.querySelector('[aria-label="Export Markdown copy"]')).toBeNull();
     cleanup();
+  });
+
+  it("steps zoom from the View menu and stops at the ends", () => {
+    const { editor, element } = makeEditor();
+    const cleanup = installToolbar(editor, element, toolbarOptions());
+    const zoom = document.querySelector<HTMLSelectElement>('[aria-label="Editor zoom"]')!;
+    const send = (detail: ZoomCommand) =>
+      window.dispatchEvent(new CustomEvent(ZOOM_COMMAND_EVENT, { detail }));
+
+    zoom.value = "100";
+    send("in");
+    expect(zoom.value).toBe("110");
+    expect(element.style.getPropertyValue("--editor-zoom")).toBe("1.1");
+    send("out");
+    send("out");
+    expect(zoom.value).toBe("90");
+    for (let i = 0; i < 10; i += 1) send("out");
+    expect(zoom.value).toBe("75");
+    send("reset");
+    expect(zoom.value).toBe("100");
+
+    cleanup();
+    send("in");
+    expect(zoom.value).toBe("100");
   });
 
   it("shows live autosave state and unsubscribes on cleanup", () => {

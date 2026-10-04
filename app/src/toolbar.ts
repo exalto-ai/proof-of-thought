@@ -12,6 +12,10 @@ export type FontSizeState = string | "mixed";
 
 const ZOOM_KEY = "thought.zoom";
 
+/** Dispatched on `window` with a `ZoomCommand` to step the editor's zoom. */
+export const ZOOM_COMMAND_EVENT = "thought-zoom";
+export type ZoomCommand = "in" | "out" | "reset";
+
 function option(value: string, label: string): HTMLOptionElement {
   const item = document.createElement("option");
   item.value = value;
@@ -244,6 +248,17 @@ export function installToolbar(
   };
 
   zoom.addEventListener("change", () => applyZoom(safeZoom(zoom.value)));
+  // View → Zoom In, Zoom Out, and Actual Size step through the same levels.
+  const onZoomCommand = (event: Event) => {
+    const command = (event as CustomEvent<ZoomCommand>).detail;
+    const index = ZOOM_LEVELS.indexOf(safeZoom(zoom.value));
+    const next = command === "reset"
+      ? 100
+      : ZOOM_LEVELS[Math.min(Math.max(index + (command === "in" ? 1 : -1), 0), ZOOM_LEVELS.length - 1)];
+    zoom.value = String(next);
+    applyZoom(next);
+  };
+  window.addEventListener(ZOOM_COMMAND_EVENT, onZoomCommand);
   block.addEventListener("change", () => {
     if (block.value === "mixed") return;
     applyBlockStyle(editor, block.value as BlockStyle);
@@ -266,6 +281,7 @@ export function installToolbar(
   update();
 
   return () => {
+    window.removeEventListener(ZOOM_COMMAND_EVENT, onZoomCommand);
     editor.off("selectionUpdate", update);
     editor.off("transaction", update);
     unsubscribeSaveStatus();

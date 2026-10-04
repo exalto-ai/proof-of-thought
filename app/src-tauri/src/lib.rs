@@ -362,6 +362,9 @@ const NEW_WINDOW_MENU_ID: &str = "new-window";
 const CLOSE_WINDOW_MENU_ID: &str = "close-window";
 /// File-menu commands the focused document window carries out itself.
 const MENU_ACTION_EVENT: &str = "menu-action";
+const ZOOM_IN_MENU_ID: &str = "zoom-in";
+const ZOOM_OUT_MENU_ID: &str = "zoom-out";
+const ACTUAL_SIZE_MENU_ID: &str = "zoom-reset";
 
 /// Show the one app-wide Settings window, creating it on first use.
 ///
@@ -428,6 +431,27 @@ fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
                 let separator = PredefinedMenuItem::separator(app)?;
                 submenu.insert_items(&[&new_note, &new_window, &separator], 0)?;
                 submenu.append(&close_window)?;
+            }
+            // The editor's zoom, as in any Mac document app.
+            if submenu.text()? == "View" {
+                let actual_size = MenuItem::with_id(
+                    app,
+                    ACTUAL_SIZE_MENU_ID,
+                    "Actual Size",
+                    true,
+                    Some("CmdOrCtrl+0"),
+                )?;
+                let zoom_in =
+                    MenuItem::with_id(app, ZOOM_IN_MENU_ID, "Zoom In", true, Some("CmdOrCtrl+="))?;
+                let zoom_out = MenuItem::with_id(
+                    app,
+                    ZOOM_OUT_MENU_ID,
+                    "Zoom Out",
+                    true,
+                    Some("CmdOrCtrl+-"),
+                )?;
+                let separator = PredefinedMenuItem::separator(app)?;
+                submenu.insert_items(&[&actual_size, &zoom_in, &zoom_out, &separator], 0)?;
             }
         }
     }
@@ -834,7 +858,8 @@ pub fn run() {
                         eprintln!("could not open Settings: {error}");
                     }
                 }
-                id @ (NEW_NOTE_MENU_ID | NEW_WINDOW_MENU_ID) => {
+                id @ (NEW_NOTE_MENU_ID | NEW_WINDOW_MENU_ID | ZOOM_IN_MENU_ID
+                | ZOOM_OUT_MENU_ID | ACTUAL_SIZE_MENU_ID) => {
                     // The window knows which note it shows; Settings ignores these.
                     if let Some(window) = focused {
                         let _ = app.emit_to(window.label(), MENU_ACTION_EVENT, id);

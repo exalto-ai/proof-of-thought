@@ -28,6 +28,7 @@ import { tauriProProviderBridge } from "./pro-provider-bridge";
 import { SyncProvider, type AgentPresence, type ProviderStatus } from "./provider";
 import { readItem, safeLocalStorage, safeSessionStorage, writeItem } from "./storage";
 import { installTheme } from "./theme";
+import { ZOOM_COMMAND_EVENT, type ZoomCommand } from "./toolbar";
 import { installToolbarPosition } from "./toolbar-position";
 import {
   installSuggestionReview,
@@ -729,12 +730,17 @@ for (const type of ["dragover", "drop"] as const) {
   });
 }
 
-// File → New Note (⌘N) and New Window (⇧⌘N) are native menu items; the menu
-// hands them to the focused window, which knows which note it shows.
+// File → New Note (⌘N) and New Window (⇧⌘N), and View → Zoom, are native
+// menu items; the menu hands them to the focused window, which knows which
+// note it shows.
 if (isTauri()) {
   void getCurrentWebviewWindow().listen<string>("menu-action", ({ payload }) => {
     if (payload === "new-note") void createNewDocument();
     else if (payload === "new-window" && openDocId) void openInNewWindow(openDocId);
+    else if (payload === "zoom-in" || payload === "zoom-out" || payload === "zoom-reset") {
+      const command: ZoomCommand = payload === "zoom-in" ? "in" : payload === "zoom-out" ? "out" : "reset";
+      window.dispatchEvent(new CustomEvent(ZOOM_COMMAND_EVENT, { detail: command }));
+    }
   });
 }
 
