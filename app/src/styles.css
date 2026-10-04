@@ -23,6 +23,8 @@
   --status-negative-soft: #f0aaa4;
   --shadow: 0 18px 48px rgba(0, 0, 0, 0.46);
   --shadow-soft: rgba(0, 0, 0, 0.12);
+  /* Floating surfaces over the writing: toolbar, slips, peer labels. */
+  --shadow-float: rgba(0, 0, 0, 0.34);
 
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
@@ -60,6 +62,7 @@
     --status-negative-soft: #9e2f28;
     --shadow: 0 18px 48px rgba(15, 27, 42, 0.14);
     --shadow-soft: rgba(15, 27, 42, 0.06);
+    --shadow-float: rgba(15, 27, 42, 0.12);
   }
 }
 :root[data-theme="light"] {
@@ -80,6 +83,7 @@
   --status-negative-soft: #9e2f28;
   --shadow: 0 18px 48px rgba(15, 27, 42, 0.14);
   --shadow-soft: rgba(15, 27, 42, 0.06);
+  --shadow-float: rgba(15, 27, 42, 0.12);
 }
 
 .sr-only {
@@ -840,7 +844,7 @@ body.settings-page {
   color: var(--ink);
   font: 12px/1.45 var(--sans);
   letter-spacing: 0;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 10px 24px var(--shadow-soft);
 }
 .suggestion-slip[data-state="stale"] {
   border-left-color: var(--ink-faint);
@@ -945,7 +949,7 @@ body.settings-page {
   border: 1px solid color-mix(in srgb, var(--ink) 12%, var(--rule));
   border-radius: 12px;
   background: color-mix(in srgb, var(--raised) 92%, transparent);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 8px 28px var(--shadow-float);
   backdrop-filter: blur(16px) saturate(125%);
   -webkit-backdrop-filter: blur(16px) saturate(125%);
   scrollbar-width: none;
@@ -1179,7 +1183,7 @@ body.settings-page {
   white-space: nowrap;
   user-select: none;
   pointer-events: none;
-  box-shadow: 0 5px 16px rgba(10, 14, 22, 0.22);
+  box-shadow: 0 5px 16px var(--shadow-soft);
   opacity: 0;
   transform: translateY(3px);
   transition: opacity 130ms ease, transform 130ms ease;
@@ -1260,7 +1264,7 @@ body.settings-page {
   font-size: 13px;
   cursor: default;
 }
-.slash-item.selected { background: var(--accent); color: #fff; }
+.slash-item.selected { background: var(--accent); color: var(--paper); }
 .slash-item.none { color: var(--ink-faint); }
 .slash-hint {
   margin-left: auto;
@@ -1268,7 +1272,7 @@ body.settings-page {
   font-size: 10.5px;
   color: var(--ink-faint);
 }
-.slash-item.selected .slash-hint { color: rgba(255, 255, 255, 0.75); }
+.slash-item.selected .slash-hint { color: color-mix(in srgb, var(--paper) 75%, transparent); }
 
 .link-input {
   position: fixed;
@@ -1450,7 +1454,7 @@ body.settings-page {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.hit.selected { background: var(--accent); color: #fff; }
+.hit.selected { background: var(--accent); color: var(--paper); }
 .empty { padding: 10px; font-size: 13px; color: var(--ink-faint); }
 .switcher-hint {
   padding: 8px 14px;

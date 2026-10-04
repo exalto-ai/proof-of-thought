@@ -19,7 +19,10 @@ document or it does not belong in the app.
 | Negative | `#d66b63` | Error, failed, destructive, and offline state |
 | Negative text | `#f0aaa4` | Negative status copy on the ground |
 
-These are defined once in [`app/src/styles.css`](app/src/styles.css). Interface code should use the tokens.
+These are defined in [`app/src/styles.css`](app/src/styles.css). Interface code should use the tokens; the
+only literal colour outside them is white text on a person's presence colour. The light palette
+is written twice there, for Auto and for pinned Light, and `theme-palette.test.ts` keeps the two
+copies identical and in step with the dark token set.
 
 ## Light palette
 
