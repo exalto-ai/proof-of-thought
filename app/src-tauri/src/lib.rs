@@ -17,6 +17,8 @@ use thoughtd::discovery::{self, Daemon};
 
 #[cfg(target_os = "macos")]
 mod macos_secure_input;
+#[cfg(target_os = "macos")]
+mod macos_title_bar;
 mod pro_chat;
 mod pro_provider;
 mod provider_credentials;
@@ -433,14 +435,13 @@ fn new_window(
         .visible(false);
     #[cfg(target_os = "macos")]
     {
-        // Matches tauri.conf.json: window buttons centred on the 44px
-        // title-bar row the page draws, beside the sidebar toggle.
         builder = builder
             .title_bar_style(tauri::TitleBarStyle::Overlay)
-            .hidden_title(true)
-            .traffic_light_position(tauri::LogicalPosition::new(16.0, 24.0));
+            .hidden_title(true);
     }
     let child = builder.build().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    macos_title_bar::place_webview_window_buttons(&child);
     if let Ok(target_size) = child.outer_size()
         && let Some(position) = cascaded_position(&window, target_size)
     {
@@ -775,6 +776,36 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(daemon)
         .menu(app_menu)
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::Manager as _;
+                if let Some(window) = app.get_webview_window("main") {
+                    macos_title_bar::place_webview_window_buttons(&window);
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = app;
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            // AppKit lays the title bar out again on these, moving the window
+            // buttons back; Settings keeps the standard title bar.
+            #[cfg(target_os = "macos")]
+            if window.label() != SETTINGS_WINDOW
+                && matches!(
+                    event,
+                    tauri::WindowEvent::Focused(_)
+                        | tauri::WindowEvent::Resized(_)
+                        | tauri::WindowEvent::ScaleFactorChanged { .. }
+                        | tauri::WindowEvent::ThemeChanged(_)
+                )
+            {
+                macos_title_bar::place_window_buttons(window);
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (window, event);
+        })
         .on_menu_event(|app, event| {
             if event.id() == SETTINGS_MENU_ID
                 && let Err(error) = open_settings(app.clone())

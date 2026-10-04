@@ -38,9 +38,11 @@
      the return sweep. It is deliberate here: this is a working document with
      tables and code in it, not a book, and those want the room. */
   --measure: 48rem;
-  --chrome-height: 44px;
-  /* Where the macOS window buttons end (see trafficLightPosition in
-     tauri.conf.json), and so where the left sidebar toggle starts. */
+  /* Matches the compact unified title bar macOS lays out (see
+     macos_title_bar.rs), so the toggles share the window buttons' centre. */
+  --chrome-height: 39px;
+  /* Just past where macOS places the window buttons in the compact title
+     bar, and so where the left sidebar toggle starts. */
   --window-buttons-end: 84px;
 }
 
