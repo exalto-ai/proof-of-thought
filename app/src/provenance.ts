@@ -183,12 +183,18 @@ export function installProvenanceRails(
 
   function draw() {
     frame = null;
-    const blocks = [...editor.view.dom.children] as HTMLElement[];
+    // Each block's own element: suggestions add widgets between blocks, so
+    // the editor's children are not the blocks one for one.
+    const blocks: HTMLElement[] = [];
+    const kinds: string[] = [];
+    editor.state.doc.forEach((node, offset) => {
+      kinds.push(node.type.name);
+      const element = editor.view.nodeDOM(offset);
+      if (element instanceof HTMLElement) blocks.push(element);
+    });
     // Read once: every rail is placed against this, and asking per rail would
     // put a layout read in a loop that already runs on every keystroke.
     const originTop = layer.getBoundingClientRect().top;
-    const kinds: string[] = [];
-    editor.state.doc.forEach((node) => kinds.push(node.type.name));
 
     // Keeping the last frame beats drawing against blocks that have moved; the
     // next update redraws anyway.

@@ -8,7 +8,9 @@ Configured reviewers can propose a change. They cannot edit document content dir
 2. It calls `suggest_change` with one block-addressed operation and a unique `request_id`.
 3. The daemon validates and normalizes the patch once, then stores it in the document's
    `suggestions` Y.Map. The existing CRDT op log persists and replicates it.
-4. Any editor window can accept or reject through the editor-only API.
+4. Any editor window can accept or reject through the editor-only API. The window shows a
+   pending proposal in the text itself, as tracked changes: proposed words in the accent,
+   removed words struck through. Clicking one opens a small card with Accept and Reject.
 5. Acceptance applies the stored patch and marks it accepted in one CRDT update. Accepted
    text is attributed to the reviewer with `suggestion` ingress.
 

@@ -204,11 +204,12 @@ function harness(kinds: string[]) {
   for (const _ of kinds) dom.append(document.createElement("p"));
 
   const editor = {
-    view: { dom },
+    view: { dom, nodeDOM: (offset: number) => dom.children[offset] ?? null },
     state: {
       doc: {
-        forEach: (visit: (node: { type: { name: string } }) => void) =>
-          kinds.forEach((kind) => visit({ type: { name: kind } })),
+        // Offsets stand in for positions; the fake view maps them back.
+        forEach: (visit: (node: { type: { name: string } }, offset: number) => void) =>
+          kinds.forEach((kind, index) => visit({ type: { name: kind } }, index)),
       },
     },
     on() {},

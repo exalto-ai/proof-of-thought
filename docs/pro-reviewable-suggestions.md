@@ -1,10 +1,10 @@
 # Reviewable chat suggestions
 
-A complete built-in chat response has one optional action: **Suggest in document**.
+A complete built-in chat response has one optional action: **Add to Note**.
 
 The action waits for current editor changes to save, then creates a pending block insertion at the
-current caret or selection block. Current wording does not change until the person accepts the
-existing suggestion review slip. Reject changes no wording.
+current caret or selection block. Current wording does not change until the person accepts it.
+Reject changes no wording.
 
 The daemon compares the response’s wording revision with the current document before storing the
 proposal. A response generated for older wording must be regenerated. Provider and model labels
