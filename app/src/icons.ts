@@ -24,6 +24,10 @@ export const ICONS = {
     ["path", { d: "M9 15h6" }],
     ["path", { d: "M12 18v-6" }],
   ],
+  search: [
+    ["path", { d: "m21 21-4.34-4.34" }],
+    ["circle", { cx: "11", cy: "11", r: "8" }],
+  ],
   settings: [
     [
       "path",

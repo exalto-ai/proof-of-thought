@@ -104,6 +104,7 @@ export function installDocumentSidebar(
   let refreshTimer: number | null = null;
 
   create.append(icon(ICONS.filePlus));
+  filter.before(icon(ICONS.search));
 
   const panel = installSidePanel(root, {
     storage: options.storage,
