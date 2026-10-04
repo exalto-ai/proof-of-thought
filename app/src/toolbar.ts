@@ -185,6 +185,7 @@ export function installToolbar(
     true,
   );
 
+  const saveDivider = divider();
   const saveStatus = document.createElement("span");
   saveStatus.className = "save-status";
   const saveAlert = document.createElement("span");
@@ -193,25 +194,20 @@ export function installToolbar(
   saveAlert.setAttribute("aria-live", "polite");
   saveAlert.setAttribute("aria-atomic", "true");
 
+  // Saving is expected, as in any Mac editor, so the toolbar says nothing
+  // while it works and speaks up only when changes cannot reach the store.
+  const problems: Partial<Record<SaveStatus, { label: string; title: string }>> = {
+    offline: { label: "Offline", title: "Changes will autosave after reconnecting" },
+    error: { label: "Save failed", title: "Autosave failed; changes remain queued" },
+  };
   const renderSaveStatus = (status: SaveStatus) => {
-    const labels: Record<SaveStatus, string> = {
-      connecting: "Connecting…",
-      saved: "Autosaved",
-      saving: "Saving…",
-      offline: "Offline",
-      error: "Save failed",
-    };
-    const titles: Record<SaveStatus, string> = {
-      connecting: "Connecting to autosave",
-      saved: "All changes are autosaved",
-      saving: "Autosaving changes",
-      offline: "Changes will autosave after reconnecting",
-      error: "Autosave failed; changes remain queued",
-    };
+    const problem = problems[status];
     saveStatus.dataset.state = status;
-    saveStatus.textContent = labels[status];
-    saveStatus.title = titles[status];
-    saveAlert.textContent = status === "offline" || status === "error" ? titles[status] : "";
+    saveStatus.hidden = !problem;
+    saveDivider.hidden = !problem;
+    saveStatus.textContent = problem?.label ?? "";
+    saveStatus.title = problem?.title ?? "";
+    saveAlert.textContent = problem?.title ?? "";
   };
 
   toolbar.append(
@@ -225,7 +221,7 @@ export function installToolbar(
     bold,
     italic,
     link,
-    divider(),
+    saveDivider,
     saveStatus,
     saveAlert,
   );

@@ -285,16 +285,21 @@ describe("installed toolbar", () => {
     const status = document.querySelector<HTMLElement>(".save-status")!;
     const alert = document.querySelector<HTMLElement>('[role="status"]')!;
 
-    expect(status.textContent).toBe("Saving…");
+    // Saving and saved are the expected state: nothing to show.
+    expect(status.hidden).toBe(true);
     expect(status.dataset.state).toBe("saving");
     expect(alert.textContent).toBe("");
     publish?.("saved");
-    expect(status.textContent).toBe("Autosaved");
-    expect(status.title).toContain("autosaved");
+    expect(status.hidden).toBe(true);
     expect(status.hasAttribute("aria-live")).toBe(false);
     publish?.("offline");
+    expect(status.hidden).toBe(false);
+    expect(status.textContent).toBe("Offline");
     expect(alert.textContent).toContain("reconnecting");
+    publish?.("error");
+    expect(status.textContent).toBe("Save failed");
     publish?.("saving");
+    expect(status.hidden).toBe(true);
     expect(alert.textContent).toBe("");
 
     cleanup();

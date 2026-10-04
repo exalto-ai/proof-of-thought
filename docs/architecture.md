@@ -890,8 +890,9 @@ is never persisted — it is presence, not content.
 
 The daemon sends `ACK` only after an `UPDATE` has reached SQLite. The window keeps every
 local update queued until that acknowledgement, merges work that has not yet been sent,
-and resends unacknowledged work after reconnecting. The toolbar reports Connecting,
-Autosaved, Saving, Offline, or Save failed. A no-op resend is acknowledged too, since Yjs
+and resends unacknowledged work after reconnecting. The toolbar is silent while
+saving works and shows Offline or Save failed only when edits cannot reach the store, as a Mac
+editor says nothing about routine saves; the window's close guard still waits for the ACK. A no-op resend is acknowledged too, since Yjs
 updates are idempotent and an ACK can be lost when a socket closes.
 
 **Cost:** the window now owns a two-slot retry queue and retains unacknowledged Yjs bytes.

@@ -1238,10 +1238,6 @@ body.settings-page {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  /* Fits the widest label ("Connecting…"). The centered toolbar is sized to
-     its content, so a narrower box re-centers the whole bar on every
-     Saving…/Autosaved flip while typing. */
-  min-width: 8.5em;
   padding: 0 6px 0 4px;
   color: var(--ink-faint);
   font: 500 11px/1 var(--sans);
@@ -1255,18 +1251,9 @@ body.settings-page {
   border-radius: 50%;
   background: currentColor;
 }
-.save-status[data-state="saved"] { color: var(--status-positive); }
-.save-status[data-state="connecting"] { color: var(--ink-faint); }
-.save-status[data-state="saving"] { color: var(--status-caution); }
 .save-status[data-state="offline"],
 .save-status[data-state="error"] { color: var(--status-negative); }
-.save-status[data-state="saving"]::before { animation: save-pulse 900ms ease-in-out infinite; }
-@keyframes save-pulse {
-  50% { opacity: 0.35; transform: scale(0.78); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .save-status[data-state="saving"]::before { animation: none; }
-}
+.save-status[hidden], .format-divider[hidden] { display: none; }
 @media (max-width: 600px) {
   .format-toolbar { gap: 1px; padding-inline: 3px; }
   .format-divider { margin-inline: 0; }
