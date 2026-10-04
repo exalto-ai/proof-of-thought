@@ -13,7 +13,8 @@ import { installDocumentSidebar } from "./doc-sidebar";
 import { ICONS, icon } from "./icons";
 import { createEditor, editorSnapshot } from "./editor";
 import { EditorApi } from "./editor-api";
-import { installCurrentSources } from "./current-sources";
+import { installProof } from "./proof";
+import { chatStats } from "./pro-chat";
 import {
   exportMarkdownDocument,
   importMarkdownDocument,
@@ -144,11 +145,22 @@ async function visibleWordingRevision(): Promise<string | null> {
   return revision;
 }
 
-const currentSources = installCurrentSources(
-  document,
-  (docId) => mcp.documentLineage(docId),
-  visibleWordingRevision,
-);
+const proof = installProof(document, {
+  lineage: (docId) => mcp.documentLineage(docId),
+  activity: (docId) => editorApi.documentActivity(docId),
+  suggestions: async (docId) => {
+    const counts = { accepted: 0, rejected: 0, pending: 0 };
+    for (const { state } of (await editorApi.listSuggestions(docId)).suggestions) {
+      if (state === "accepted") counts.accepted += 1;
+      else if (state === "rejected") counts.rejected += 1;
+      else counts.pending += 1;
+    }
+    return counts;
+  },
+  chat: (docId) => chatStats(safeLocalStorage(), docId),
+  visibleRevision: visibleWordingRevision,
+  wordCount: () => open?.editor.getText().split(/\s+/).filter(Boolean).length ?? 0,
+});
 
 /**
  * Agents that have written recently.
@@ -371,7 +383,7 @@ async function openDocument(docId: string): Promise<boolean> {
   }
   if (!(await canLeaveCurrentDocument())) return false;
   aiSupport.setCurrentDocument(null);
-  currentSources.setDocument(null);
+  proof.setDocument(null);
   open?.suggestions.destroy();
   open?.rails.destroy();
   open?.provider.destroy();
@@ -418,7 +430,7 @@ async function openDocument(docId: string): Promise<boolean> {
   provider.connect();
   open = { doc, awareness, provider, editor, rails, suggestions };
   openDocId = docId;
-  currentSources.setDocument(docId);
+  proof.setDocument(docId);
 
   // Exposed in development so the editor can be driven directly. Synthetic
   // key events do not reach ProseMirror's input handling reliably, which makes
@@ -429,15 +441,15 @@ async function openDocument(docId: string): Promise<boolean> {
 
   editor.on("update", () => refreshTitle(editor));
   editor.on("update", scheduleProvenance);
-  editor.on("update", currentSources.scheduleRefresh);
+  editor.on("update", proof.scheduleRefresh);
   const stopSourceHydration = provider.subscribeHydration((hydrated) => {
     if (!hydrated) return;
     refreshTitle(editor);
-    currentSources.scheduleRefresh();
+    proof.scheduleRefresh();
   });
   const stopSourceSaveStatus = provider.subscribeSaveStatus((status) => {
     if (status === "saved") {
-      currentSources.scheduleRefresh();
+      proof.scheduleRefresh();
       docSidebar.scheduleRefresh();
     }
   });

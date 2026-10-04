@@ -106,12 +106,20 @@
         </div>
 
         <div class="sidebar-pane" id="ai-pane-proof" role="tabpanel" aria-labelledby="ai-tab-proof" hidden>
-        <section class="current-sources" aria-labelledby="current-sources-title">
-          <h3 id="current-sources-title">Sources</h3>
-          <p id="current-source-status" aria-live="polite">Open a document to see its sources.</p>
-          <button class="text-button" id="current-source-retry" type="button" hidden>Try again</button>
-          <ul id="current-source-list" hidden></ul>
-          <p class="ai-sidebar-note" id="current-source-note" hidden>How text entered this note, not proof of who wrote it.</p>
+        <section class="proof" aria-label="How this note was written">
+          <p class="proof-status" id="proof-status" aria-live="polite">Open a note to see how it was written.</p>
+          <button class="text-button" id="proof-retry" type="button" hidden>Try again</button>
+          <div class="proof-body" id="proof-body" hidden>
+            <div class="proof-chart proof-share">
+              <canvas id="proof-share-chart" role="img" aria-label="Share of the current text by source"></canvas>
+            </div>
+            <p class="proof-status" id="proof-share-note" hidden></p>
+            <dl class="proof-stats" id="proof-stats"></dl>
+            <div class="proof-chart proof-activity">
+              <canvas id="proof-activity-chart" role="img" aria-label="Changes over time, by you and by AI"></canvas>
+            </div>
+            <p class="ai-sidebar-note">From this Mac's records. AI names are as reported.</p>
+          </div>
         </section>
         </div>
       </aside>

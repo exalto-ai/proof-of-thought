@@ -1,5 +1,6 @@
 import type { DocumentView } from "./mcp";
 import type { ProProvider } from "./pro-provider-bridge";
+import type { ActivityEvent } from "./proof";
 import type {
   ReviewerApi,
   ReviewerConnection,
@@ -55,6 +56,15 @@ export class EditorApi implements ReviewerApi {
       "GET",
       `/editor/documents/${encodeURIComponent(docId)}/suggestions`,
     );
+  }
+
+  /** Every recorded change to a note, oldest first, for the Proof tab. */
+  async documentActivity(docId: string): Promise<ActivityEvent[]> {
+    const { events } = await this.request<{ events: ActivityEvent[] }>(
+      "GET",
+      `/editor/documents/${encodeURIComponent(docId)}/activity`,
+    );
+    return events;
   }
 
   proposeChatSuggestion(input: ChatSuggestionInput): Promise<SuggestionDecisionOutcome> {

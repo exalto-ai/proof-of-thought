@@ -8,8 +8,8 @@ This file covers copied assets and the locked production dependencies shipped in
 
 ### Lucide
 
-The editor includes the `panel-left`, `panel-right`, `settings`, `message-square`, `plug`, `search`, `plus`, `arrow-up`, `paperclip`, `globe`, `copy`, `pencil`,
-`check`, `x`, `link-2`, and `link-2-off` icons from
+The editor includes the `file-plus`, `panel-left`, `panel-right`, `settings`, `message-square`, `plug`, `search`, `plus`, `arrow-up`, `paperclip`, `globe`, `copy`, `pencil`,
+`link-2`, and `link-2-off` icons from
 [Lucide](https://github.com/lucide-icons/lucide), copied from commit
 `23f9abc4ed0146cffededd3d7f94c1018bfdf693`.
 
@@ -8030,6 +8030,7 @@ Apache License
 
 ### Inventory
 
+- `@kurkle/color@0.3.4` — MIT — runtime — git+https://github.com/kurkle/color.git
 - `@tauri-apps/api@2.11.1` — Apache-2.0 OR MIT — runtime — git+https://github.com/tauri-apps/tauri.git
 - `@tauri-apps/plugin-opener@2.5.4` — MIT OR Apache-2.0 — runtime — https://github.com/tauri-apps/plugins-workspace
 - `@tiptap/core@3.30.2` — MIT — runtime — https://github.com/ueberdosis/tiptap
@@ -8061,6 +8062,7 @@ Apache License
 - `@tiptap/pm@3.30.2` — MIT — runtime — https://github.com/ueberdosis/tiptap
 - `@tiptap/starter-kit@3.30.2` — MIT — runtime — https://github.com/ueberdosis/tiptap
 - `@tiptap/y-tiptap@3.0.9` — MIT — runtime — git+https://github.com/ueberdosis/y-tiptap.git
+- `chart.js@4.5.1` — MIT — runtime — https://github.com/chartjs/Chart.js.git
 - `isomorphic.js@0.2.5` — MIT — runtime — git+https://github.com/dmonad/isomorphic.js.git
 - `lib0@0.2.117` — MIT — runtime — git+https://github.com/dmonad/lib0.git
 - `linkifyjs@4.3.3` — MIT — runtime — git+https://github.com/nfrasser/linkifyjs.git
@@ -8085,6 +8087,20 @@ Apache License
 - `yjs@13.6.32` — MIT — runtime — https://github.com/yjs/yjs.git
 
 ### License texts
+
+### MIT
+
+Used by: `@kurkle/color@0.3.4`
+
+The MIT License (MIT)
+
+Copyright (c) 2018-2024 Jukka Kurkela
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### Apache-2.0 OR MIT
 
@@ -8370,6 +8386,20 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+### MIT
+
+Used by: `chart.js@4.5.1`
+
+The MIT License (MIT)
+
+Copyright (c) 2014-2024 Chart.js Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### MIT
 

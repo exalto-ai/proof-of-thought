@@ -716,29 +716,23 @@ button.pro-chat-change:focus-visible {
   flex-direction: column;
 }
 .sidebar-pane[hidden] { display: none; }
-.current-sources {
+/* Proof: the charts are Chart.js; rows reuse the Settings row. */
+.proof {
   flex: 1 1 auto;
   min-height: 0;
   padding: 10px 16px 14px;
   overflow-y: auto;
-}
-.current-sources h3 { margin-bottom: 8px; }
-.current-sources > p { margin: 0 0 8px; color: var(--ink-soft); font-size: 12px; }
-.current-sources ul {
-  display: grid;
-  gap: 6px;
-  margin: 0 0 8px;
-  padding: 0;
-  list-style: none;
-}
-.current-sources li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
   font-size: 12px;
 }
-.current-sources li span { color: var(--ink-faint); font-size: 11px; text-transform: capitalize; }
+.proof-status { margin: 0 0 8px; color: var(--ink-soft); }
+.proof-chart { position: relative; }
+.proof-share { height: 150px; }
+.proof-activity { height: 140px; margin-top: 14px; }
+.proof canvas[hidden] { display: none; }
+.proof-stats { margin: 10px 0 0; }
+.proof-stats .settings-row { min-height: 0; padding: 7px 0; }
+.proof-stats dt { color: var(--ink-soft); }
+.proof-stats dd { margin: 0; text-align: right; }
 
 /* ---------- Sign in with ChatGPT ---------- */
 /* OpenAI's logo, drawn in the current text colour from the official asset. */

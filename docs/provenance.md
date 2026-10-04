@@ -69,14 +69,26 @@ and recovery states, and imply verification that a local bearer token cannot pro
 Later evidence or trace features may refer to a source event. They do not need a second lineage
 ledger.
 
-## Current sources view
+## Proof tab
 
-The right sidebar's Proof tab reads `document_lineage` directly and groups sources already present in
-the response. It shows labels, assurance, and alignment. It does not expose percentages, build a
-separate consumer ledger, or replay event history in the browser.
+The right sidebar's Proof tab shows how the open note was written:
+
+- **A doughnut of the current text by source**, from `document_lineage`'s grouped contributions
+  by non-whitespace graphemes. Sources are merged into the slices a reader recognizes: You (typed
+  or edited here), Pasted, Imported, each AI by its reported name, and Unknown.
+- **Numbers:** words; your estimated writing time (changes under five minutes apart count as
+  one sitting, and each sitting counts at least a minute); changes by you and by AI; AI
+  suggestions accepted, rejected, and pending; chat replies and the time they took.
+- **Activity:** changes per hour or day, by you and by AI, from the editor-only
+  `/editor/documents/{id}/activity` route over the existing provenance events.
+
+Amended 2026-10-04: this view used to list sources without amounts, so it could not read as a
+verdict on authorship. Without amounts, though, it said almost nothing a person could use, so it
+now shows shares. Shares and times are local, self-reported records, and the tab says so. They
+are an account of how text arrived on this Mac, not proof of who wrote it.
 
 Each response includes a SHA-256 revision of the normalized Markdown projection. The native
-window computes the same revision from its visible editor tree and displays sources only when the
+window computes the same revision from its visible editor tree and draws the share only when the
 two match. Pending saves, invalid editor trees, and stale responses fail closed. This binds the
 labels to the wording and formatting on screen; it is not a signature, timestamp, or proof of
 origin.
