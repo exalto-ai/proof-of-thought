@@ -10,6 +10,7 @@ import type * as Y from "yjs";
 import type { Transform } from "@tiptap/pm/transform";
 import { extensions } from "./schema";
 import type { SyncProvider } from "./provider";
+import { FindExtension, installFind } from "./find";
 import { installLinkShortcut } from "./link";
 import { installSlashMenu } from "./slash";
 import { installToolbar, type ToolbarOptions } from "./toolbar";
@@ -109,6 +110,7 @@ export function createEditor(
     extensions: [
       editorMutationExtension(provider),
       ...extensions,
+      FindExtension,
       // The fragment name must match the daemon's root (thought_core::CONTENT).
       Collaboration.configure({ fragment: doc.getXmlFragment("content") }),
       CollaborationCaret.configure({
@@ -129,6 +131,7 @@ export function createEditor(
   const destroyCanvasFocus = installEditorCanvasFocus(editor, element);
   const destroySlashMenu = installSlashMenu(editor, host);
   const links = installLinkShortcut(editor, host);
+  const destroyFind = installFind(editor, element.closest<HTMLElement>(".main-column") ?? host);
   const destroyToolbar = installToolbar(editor, element, {
     ...actions,
     openLink: links.open,
@@ -141,6 +144,7 @@ export function createEditor(
     destroySlashMenu();
     destroyCanvasFocus();
     links.destroy();
+    destroyFind();
     destroyToolbar();
     unsubscribeHydration();
   });

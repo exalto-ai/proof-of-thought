@@ -152,6 +152,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   height: var(--chrome-height);
 }
 .main-column {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -1028,6 +1029,52 @@ body.settings-page {
   line-height: 1.08;
   letter-spacing: -0.035em;
 }
+
+/* ---------- find (⌘F) ---------- */
+.find-bar {
+  position: absolute;
+  top: calc(var(--chrome-height) + 6px);
+  right: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--raised);
+  box-shadow: 0 8px 24px var(--shadow-float);
+  font: 13px var(--sans);
+}
+.find-bar[hidden] { display: none; }
+.find-bar input {
+  width: 200px;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+  font: inherit;
+}
+.find-bar input:focus { outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.find-count { min-width: 64px; color: var(--ink-faint); font-size: 12px; text-align: right; }
+.find-bar button {
+  height: 24px;
+  min-width: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: 500 15px/1 var(--sans);
+  cursor: default;
+}
+.find-bar button.find-done { font-size: 12px; }
+.find-bar button:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.find-bar button:disabled { color: var(--ink-faint); opacity: 0.5; }
+.tiptap .find-match { background: color-mix(in srgb, var(--status-caution) 30%, transparent); border-radius: 2px; }
+.tiptap .find-match-current { background: color-mix(in srgb, var(--status-caution) 75%, transparent); color: var(--paper); }
 
 /* ---------- reviewer suggestions ---------- */
 /* A proposal reads like an editorial slip attached to the affected block.
