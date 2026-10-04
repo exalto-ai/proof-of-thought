@@ -51,13 +51,18 @@ time. Acceptance does not parse or search again.
 
 ## Stale proposals
 
-`content_revision` covers normalized content, structure, block identity, and block order.
-Suggestion metadata does not change it.
+A proposal records a digest of the blocks it addresses: the replaced or deleted block's id and
+content, or the id of the block an insertion follows. Insertions at the start or end address no
+block. Edits elsewhere leave the proposal pending and acceptable, so a person can keep writing
+while suggestions wait.
 
-If any content changes after a proposal, the proposal is shown as `stale` and cannot be
+If a targeted block changes or disappears, the proposal is shown as `stale` and cannot be
 accepted. The reviewer must read the current document and submit a new proposal. Rejection
-still works.
+still works. Records written before target digests existed fall back to the whole-document
+`content_revision`, which covers normalized content, structure, block identity, and block order.
 
-This is intentionally conservative. It avoids target hashes, relative-anchor rebasing,
-overlap graphs, and automatic conflict resolution. Multiple windows do not race the state:
+This is still conservative. It avoids relative-anchor rebasing, overlap graphs, and automatic
+conflict resolution. The cost of scoping staleness to target blocks is semantic: a proposal can
+be accepted after an edit elsewhere that changes what it should say, such as a rewritten
+definition it relies on. The person accepting it sees the current note and is the check. Multiple windows do not race the state:
 all decisions pass through the one daemon authority and are serialized by the workspace.

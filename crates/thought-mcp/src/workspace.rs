@@ -542,7 +542,7 @@ impl Workspace {
             let actual_revision = content_revision(current);
             if let Some(existing) = current.suggestion(&suggestion_id)? {
                 return Ok(SuggestionOutcome {
-                    suggestion: suggestion_for_revision(existing, &actual_revision),
+                    suggestion: suggestion_for_document(existing, current, &actual_revision),
                     content_revision: actual_revision,
                     replayed: true,
                 });
@@ -555,6 +555,7 @@ impl Workspace {
                 .into());
             }
             let patch = normalize_suggested_change(current, change)?;
+            let base_target_revision = Some(target_revision(current, &patch));
             let suggestion = SuggestionRecord {
                 version: 1,
                 suggestion_id,
@@ -569,6 +570,7 @@ impl Workspace {
                     session_id: actor.session_id.clone(),
                 },
                 base_content_revision: actual_revision.clone(),
+                base_target_revision,
                 patch,
                 explanation: explanation.map(str::to_string),
                 state: SuggestionState::Pending,
@@ -603,7 +605,7 @@ impl Workspace {
                         ))
                         .into());
                     }
-                    Ok(suggestion_for_revision(suggestion, &revision))
+                    Ok(suggestion_for_document(suggestion, doc, &revision))
                 })
                 .collect::<Result<Vec<_>, WorkspaceError>>()?;
             Ok(SuggestionList {
@@ -626,7 +628,7 @@ impl Workspace {
                 .ok_or_else(|| SuggestionError::NotFound(suggestion_id.to_string()))?;
             validate_pending_suggestion(&suggestion, doc_id)?;
             let current_revision = content_revision(current);
-            if suggestion.base_content_revision != current_revision {
+            if !is_current(&suggestion, current, &current_revision) {
                 return Err(SuggestionError::BaseRevisionMismatch {
                     expected: suggestion.base_content_revision,
                     actual: current_revision,
@@ -1786,12 +1788,57 @@ fn validate_pending_suggestion(
     Ok(())
 }
 
-fn suggestion_for_revision(mut suggestion: SuggestionRecord, revision: &str) -> SuggestionRecord {
-    if suggestion.state == SuggestionState::Pending && suggestion.base_content_revision != revision
-    {
+fn suggestion_for_document(
+    mut suggestion: SuggestionRecord,
+    doc: &Document,
+    revision: &str,
+) -> SuggestionRecord {
+    if suggestion.state == SuggestionState::Pending && !is_current(&suggestion, doc, revision) {
         suggestion.state = SuggestionState::Stale;
     }
     suggestion
+}
+
+/// Whether a proposal still applies to what it was written against: the
+/// blocks it addresses, or for older records the whole document.
+fn is_current(suggestion: &SuggestionRecord, doc: &Document, revision: &str) -> bool {
+    match &suggestion.base_target_revision {
+        Some(target) => *target == target_revision(doc, &suggestion.patch),
+        None => suggestion.base_content_revision == revision,
+    }
+}
+
+/// A digest of the blocks a patch addresses: the replaced or deleted block's
+/// id and content, or the id of the block an insertion follows. Insertions at
+/// the start or end address no block, so nothing else can make them stale.
+fn target_revision(doc: &Document, patch: &SuggestionPatch) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"thought/suggestion-target/v1\0");
+    let mut block = |block_id: &str, with_content: bool| {
+        digest.update((block_id.len() as u64).to_be_bytes());
+        digest.update(block_id.as_bytes());
+        match doc.block(block_id) {
+            None => digest.update(b"missing"),
+            Some(_) if !with_content => digest.update(b"present"),
+            Some(node) => {
+                let encoded = serde_json::to_vec(&normalize(&node))
+                    .expect("document nodes always encode as JSON");
+                digest.update((encoded.len() as u64).to_be_bytes());
+                digest.update(encoded);
+            }
+        }
+    };
+    match patch {
+        SuggestionPatch::ReplaceBlock { block_id, .. }
+        | SuggestionPatch::ReplaceText { block_id, .. }
+        | SuggestionPatch::DeleteBlock { block_id } => block(block_id, true),
+        SuggestionPatch::InsertBlocks { after, .. } => match after {
+            SuggestionBlockPosition::Start => digest.update(b"start"),
+            SuggestionBlockPosition::End => digest.update(b"end"),
+            SuggestionBlockPosition::Block { block_id } => block(block_id, false),
+        },
+    }
+    base64::engine::general_purpose::STANDARD.encode(digest.finalize())
 }
 
 fn content_revision(doc: &Document) -> String {

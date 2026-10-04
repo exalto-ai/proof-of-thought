@@ -586,15 +586,9 @@ export function installSuggestionReview(
     }, 180);
   }
 
+  // Only the daemon knows whether an edit touched a suggestion's target, so
+  // ask it once the edit has saved rather than guessing here.
   function contentChanged(): void {
-    let changed = false;
-    for (const [id, suggestion] of suggestions) {
-      if (suggestion.state === "pending") {
-        suggestions.set(id, { ...suggestion, state: "stale" });
-        changed = true;
-      }
-    }
-    if (changed) render();
     if (suggestions.size > 0) scheduleRefresh(true);
   }
 

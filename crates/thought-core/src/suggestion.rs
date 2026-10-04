@@ -55,7 +55,7 @@ pub enum SuggestionState {
     Pending,
     Accepted,
     Rejected,
-    /// Derived while the document content differs from the proposal's base.
+    /// Derived while the blocks the proposal targets differ from its base.
     Stale,
 }
 
@@ -74,6 +74,11 @@ pub struct SuggestionRecord {
     pub request_id: String,
     pub proposer: SuggestionProposer,
     pub base_content_revision: String,
+    /// A digest of just the blocks the patch addresses. When present, edits
+    /// elsewhere in the document leave the proposal current. Records written
+    /// before it existed fall back to `base_content_revision`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_target_revision: Option<String>,
     pub patch: SuggestionPatch,
     pub explanation: Option<String>,
     pub state: SuggestionState,
@@ -193,6 +198,7 @@ mod tests {
                 session_id: None,
             },
             base_content_revision: "revision".into(),
+            base_target_revision: Some("target".into()),
             patch: SuggestionPatch::DeleteBlock {
                 block_id: "1:0".into(),
             },
@@ -224,5 +230,13 @@ mod tests {
             second.suggestion(&suggestion.suggestion_id).unwrap(),
             Some(suggestion)
         );
+    }
+
+    #[test]
+    fn records_written_before_target_revisions_still_decode() {
+        let mut json = serde_json::to_value(record()).unwrap();
+        json.as_object_mut().unwrap().remove("base_target_revision");
+        let decoded: SuggestionRecord = serde_json::from_value(json).unwrap();
+        assert_eq!(decoded.base_target_revision, None);
     }
 }

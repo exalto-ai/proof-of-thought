@@ -130,7 +130,7 @@ fn acceptance_applies_the_normalized_patch_and_attributes_the_reviewer() {
 }
 
 #[test]
-fn content_changes_make_pending_suggestions_stale_without_a_merge_engine() {
+fn edits_elsewhere_leave_a_proposal_acceptable() {
     let workspace = Workspace::open_in_memory().unwrap();
     let document = workspace
         .create_document_from_markdown("", "# Draft\n\nBody", &ActorRef::editor())
@@ -146,6 +146,42 @@ fn content_changes_make_pending_suggestions_stale_without_a_merge_engine() {
             &document.doc_id,
             &document.blocks[1].block_id,
             "Changed elsewhere",
+            None,
+            &ActorRef::editor(),
+        )
+        .unwrap();
+
+    let listed = workspace.list_suggestions(&document.doc_id).unwrap();
+    assert_eq!(listed.suggestions[0].state, SuggestionState::Pending);
+    workspace
+        .accept_suggestion(
+            &document.doc_id,
+            &proposal.suggestion.suggestion_id,
+            &ActorRef::editor(),
+        )
+        .unwrap();
+    let markdown = workspace.read_document(&document.doc_id).unwrap().markdown;
+    assert!(markdown.contains("# Final"));
+    assert!(markdown.contains("Changed elsewhere"));
+}
+
+#[test]
+fn edits_to_the_target_block_make_a_proposal_stale_without_a_merge_engine() {
+    let workspace = Workspace::open_in_memory().unwrap();
+    let document = workspace
+        .create_document_from_markdown("", "# Draft\n\nBody", &ActorRef::editor())
+        .unwrap();
+    let proposal = propose_replace(
+        &workspace,
+        &document.doc_id,
+        &document.blocks[0].block_id,
+        &document.content_revision,
+    );
+    workspace
+        .replace_block(
+            &document.doc_id,
+            &document.blocks[0].block_id,
+            "# Draft two",
             None,
             &ActorRef::editor(),
         )
@@ -168,7 +204,7 @@ fn content_changes_make_pending_suggestions_stale_without_a_merge_engine() {
             .read_document(&document.doc_id)
             .unwrap()
             .markdown
-            .contains("Draft")
+            .contains("Draft two")
     );
 }
 

@@ -153,9 +153,12 @@ Y.Doc
 └─ "comments"     Y.Map<id, Comment>       range-anchored threads
 ```
 
-Agent edits and suggestion patches address stable block ids. A suggestion also records an
-exact content revision; any intervening content change makes it stale. This deliberately
-trades automatic rebasing for a small, auditable acceptance path. Future range-anchored
+Agent edits and suggestion patches address stable block ids. A suggestion also records a
+digest of the blocks it targets; a change to one of them makes it stale, while edits elsewhere
+leave it acceptable. This still trades automatic rebasing for a small, auditable acceptance
+path. Amended 2026-10-04: it used to record the whole document's revision, so any keystroke
+anywhere invalidated every pending suggestion, which made in-text review unusable while
+writing. The cost is that a proposal may be accepted after a distant edit it depended on. Future range-anchored
 comments may use Yjs `RelativePosition`s independently.
 
 ---
@@ -281,8 +284,8 @@ list_suggestions(doc_id)
 ```
 
 The proposal call normalizes the requested operation once and stores that patch in the
-document's `suggestions` map. Acceptance requires the exact `content_revision`; it never
-attempts a three-way merge. See [`suggestions.md`](suggestions.md).
+document's `suggestions` map. Acceptance requires the targeted blocks to be unchanged since
+the proposal; it never attempts a three-way merge. See [`suggestions.md`](suggestions.md).
 
 ---
 
