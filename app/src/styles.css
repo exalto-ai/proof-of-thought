@@ -1216,39 +1216,46 @@ body.settings-page {
 .tiptap .find-match-current { background: color-mix(in srgb, var(--status-caution) 75%, transparent); color: var(--paper); }
 
 /* ---------- reviewer suggestions ---------- */
-/* Suggestions read as tracked changes in the text itself: proposed words in
-   the accent, removed words struck through. Clicking one opens a small card
-   to accept or reject it. Out-of-date suggestions fade to grey. */
+/* Suggestions read as tracked changes in the text itself, marked in the
+   caution hue (pending, awaiting a decision) so they never look like links:
+   proposed words highlighted, removed words struck through. Clicking one
+   opens a small card to accept or reject it. Out-of-date ones turn grey. */
 .tiptap .suggestion-inserted,
-.tiptap .suggestion-inserted-text {
-  color: var(--accent);
-  cursor: pointer;
-}
+.tiptap .suggestion-inserted-text,
+.tiptap .suggestion-deleted,
+.tiptap .suggestion-deleted-text { cursor: pointer; }
+/* Inserted blocks hug their text rather than filling the measure. */
+.tiptap .suggestion-inserted :is(p, h1, h2, h3) { width: fit-content; max-width: 100%; }
 .tiptap .suggestion-inserted-text,
 .tiptap .suggestion-inserted :is(p, h1, h2, h3, li, td, th) {
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  text-underline-offset: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--status-caution) 24%, transparent);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 .tiptap .suggestion-deleted,
 .tiptap .suggestion-deleted-text {
   color: var(--ink-faint);
   text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, var(--accent) 70%, transparent);
-  cursor: pointer;
+  text-decoration-color: var(--status-caution);
 }
 .tiptap .suggestion-deleted *,
 .tiptap .suggestion-deleted::marker { text-decoration: inherit; }
-.tiptap .is-active:is(.suggestion-inserted, .suggestion-inserted-text, .suggestion-deleted, .suggestion-deleted-text) {
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+.tiptap .suggestion-inserted-text.is-active,
+.tiptap .suggestion-inserted.is-active :is(p, h1, h2, h3, li, td, th) {
+  background: color-mix(in srgb, var(--status-caution) 36%, transparent);
 }
-.tiptap [data-state="stale"]:is(.suggestion-inserted, .suggestion-inserted-text) { color: var(--ink-faint); }
-.tiptap [data-state="stale"]:is(.suggestion-inserted-text, .suggestion-deleted, .suggestion-deleted-text),
+.tiptap .is-active:is(.suggestion-deleted, .suggestion-deleted-text) {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--status-caution) 14%, transparent);
+}
+.tiptap [data-state="stale"]:is(.suggestion-inserted-text),
 .tiptap .suggestion-inserted[data-state="stale"] :is(p, h1, h2, h3, li, td, th) {
-  text-decoration-color: color-mix(in srgb, var(--ink-faint) 60%, transparent);
+  background: color-mix(in srgb, var(--ink-faint) 16%, transparent);
 }
-.tiptap .is-active[data-state="stale"] { background: color-mix(in srgb, var(--ink-faint) 12%, transparent); }
+.tiptap [data-state="stale"]:is(.suggestion-deleted, .suggestion-deleted-text) {
+  text-decoration-color: var(--ink-faint);
+}
 
 .suggestion-popover {
   position: absolute;
