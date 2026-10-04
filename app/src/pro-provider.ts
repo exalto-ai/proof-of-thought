@@ -3,6 +3,8 @@ import type {
   ProProviderBridge,
   ProviderConfiguration,
 } from "./pro-provider-bridge";
+import { required } from "./dom";
+import { oneLine } from "./notices";
 
 const PROVIDERS: readonly ProProvider[] = ["openai", "anthropic"];
 const NAMES: Record<ProProvider, string> = {
@@ -19,24 +21,12 @@ export type ProProviderController = {
   destroy(): void;
 };
 
-function required<T extends Element>(root: ParentNode, selector: string): T {
-  const value = root.querySelector<T>(selector);
-  if (!value) throw new Error(`missing provider element: ${selector}`);
-  return value;
-}
-
-function oneLine(error: unknown): string {
-  const value = error instanceof Error ? error.message : String(error);
-  return value.replace(/[\r\n\t]+/g, " ").trim().slice(0, 180) ||
-    "Provider setup failed.";
-}
-
 export function installProProvider(
   root: Document,
   options: Options = {},
 ): ProProviderController {
-  const panel = required<HTMLElement>(root, "#provider-settings");
-  const error = required<HTMLElement>(panel, "#provider-error");
+  const panel = required<HTMLElement>(root, "#provider-settings", "provider");
+  const error = required<HTMLElement>(panel, "#provider-error", "provider");
   const bridge = options.bridge ?? null;
   const configured = new Map<ProProvider, boolean>();
   const disposers: Array<() => void> = [];
@@ -45,7 +35,7 @@ export function installProProvider(
   let generation = 0;
 
   function card(provider: ProProvider): HTMLElement {
-    return required(panel, `[data-provider="${provider}"]`);
+    return required(panel, `[data-provider="${provider}"]`, "provider");
   }
 
   function render(): void {
@@ -53,9 +43,9 @@ export function installProProvider(
     for (const provider of PROVIDERS) {
       const container = card(provider);
       const isConfigured = configured.get(provider) === true;
-      const status = required<HTMLElement>(container, "[data-provider-status]");
-      const configure = required<HTMLButtonElement>(container, "[data-provider-configure]");
-      const remove = required<HTMLButtonElement>(container, "[data-provider-remove]");
+      const status = required<HTMLElement>(container, "[data-provider-status]", "provider");
+      const configure = required<HTMLButtonElement>(container, "[data-provider-configure]", "provider");
+      const remove = required<HTMLButtonElement>(container, "[data-provider-remove]", "provider");
       status.textContent = isConfigured ? "Key saved" : "No key";
       status.dataset.configured = String(isConfigured);
       configure.textContent = isConfigured ? "Replace" : "Add key";
@@ -82,7 +72,7 @@ export function installProProvider(
       values.forEach(apply);
     } catch (cause) {
       if (destroyed || request !== generation) return;
-      error.textContent = oneLine(cause);
+      error.textContent = oneLine(cause, "Provider setup failed.");
       error.hidden = false;
     }
     render();
@@ -102,7 +92,7 @@ export function installProProvider(
       }
     } catch (cause) {
       if (destroyed) return;
-      error.textContent = oneLine(cause);
+      error.textContent = oneLine(cause, "Provider setup failed.");
       error.hidden = false;
       options.onNotice?.(`Could not save ${NAMES[provider]} key.`, "error");
     } finally {
@@ -127,7 +117,7 @@ export function installProProvider(
       }
     } catch (cause) {
       if (destroyed) return;
-      error.textContent = oneLine(cause);
+      error.textContent = oneLine(cause, "Provider setup failed.");
       error.hidden = false;
       options.onNotice?.(`Could not remove ${NAMES[provider]} key.`, "error");
     } finally {

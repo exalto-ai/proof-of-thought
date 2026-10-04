@@ -4,6 +4,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type * as Y from "yjs";
 import { alignBlocks, blockIdOf } from "./provenance";
+import { oneLine } from "./notices";
 
 export type SuggestionPosition =
   | { kind: "start" }
@@ -152,11 +153,6 @@ function anchorFor(
     return positions.get(patch.after.block_id)?.to ?? document.content.size;
   }
   return positions.get(patch.block_id)?.to ?? document.content.size;
-}
-
-function oneLine(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.replace(/[\r\n]+/g, " ").trim() || "The suggestion could not be reviewed.";
 }
 
 export function installSuggestionReview(
@@ -369,7 +365,7 @@ export function installSuggestionReview(
       editor.commands.focus();
     } catch (error) {
       if (!destroyed) {
-        const message = oneLine(error);
+        const message = oneLine(error, "The suggestion could not be reviewed.");
         errors.set(suggestion.suggestion_id, message);
         options.onNotice?.(message, "error");
       }
@@ -393,7 +389,7 @@ export function installSuggestionReview(
       render();
     } catch (error) {
       if (!destroyed && currentGeneration === generation) {
-        options.onNotice?.(`Could not load suggestions: ${oneLine(error)}`, "error");
+        options.onNotice?.(`Could not load suggestions: ${oneLine(error, "The suggestion could not be reviewed.")}`, "error");
       }
     }
   }

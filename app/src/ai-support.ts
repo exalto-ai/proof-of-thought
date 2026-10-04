@@ -4,6 +4,7 @@ import type { ChatSuggestionInput } from "./editor-api";
 import type { ProProvider, ProProviderBridge } from "./pro-provider-bridge";
 import type { ProChatBridge } from "./pro-chat-bridge";
 import { installProChat, type ProChatDocument } from "./pro-chat";
+import { required } from "./dom";
 
 export const AI_SIDEBAR_OPEN_STORAGE_KEY = "thought.ai-sidebar-open.v1";
 export const AI_SIDEBAR_WIDTH_STORAGE_KEY = "thought.ai-sidebar-width.v1";
@@ -30,12 +31,6 @@ type AiSupportController = {
   setCurrentDocument(context: ProChatDocument | null): void;
   destroy(): void;
 };
-
-function required<T extends Element>(root: ParentNode, selector: string): T {
-  const value = root.querySelector<T>(selector);
-  if (!value) throw new Error(`missing AI sidebar element: ${selector}`);
-  return value;
-}
 
 /** The sidebar starts open unless this user last closed it. */
 function readSidebarOpen(storage: Storage | null): boolean {
@@ -78,17 +73,17 @@ export function installAiSupport(
   const storage = options.storage === undefined
     ? safeLocalStorage()
     : options.storage;
-  const toggle = required<HTMLButtonElement>(root, "#ai-support-toggle");
+  const toggle = required<HTMLButtonElement>(root, "#ai-support-toggle", "AI sidebar");
   toggle.replaceChildren(sidebarToggleIcon());
   toggle.setAttribute("aria-label", "AI sidebar");
-  const sidebar = required<HTMLElement>(root, "#ai-support-sidebar");
-  const resizer = required<HTMLElement>(root, "#ai-sidebar-resizer");
-  const setupPanel = required<HTMLElement>(root, "#ai-chat-setup");
-  const chatPanel = required<HTMLElement>(root, "#pro-chat");
-  const providerSelect = required<HTMLSelectElement>(root, "#pro-chat-provider");
+  const sidebar = required<HTMLElement>(root, "#ai-support-sidebar", "AI sidebar");
+  const resizer = required<HTMLElement>(root, "#ai-sidebar-resizer", "AI sidebar");
+  const setupPanel = required<HTMLElement>(root, "#ai-chat-setup", "AI sidebar");
+  const chatPanel = required<HTMLElement>(root, "#pro-chat", "AI sidebar");
+  const providerSelect = required<HTMLSelectElement>(root, "#pro-chat-provider", "AI sidebar");
   const settingsButtons = [
-    required<HTMLButtonElement>(root, "#ai-open-settings"),
-    required<HTMLButtonElement>(root, "#ai-chat-setup-open"),
+    required<HTMLButtonElement>(root, "#ai-open-settings", "AI sidebar"),
+    required<HTMLButtonElement>(root, "#ai-chat-setup-open", "AI sidebar"),
   ];
   const disposers: Array<() => void> = [];
   const chat = installProChat(root, {

@@ -9,6 +9,8 @@ import type {
 import type { ChatSuggestionInput } from "./editor-api";
 import type { ProProvider } from "./pro-provider-bridge";
 import type { SuggestionPosition } from "./suggestions";
+import { required } from "./dom";
+import { oneLine } from "./notices";
 
 const PROVIDER_NAMES: Record<ProProvider, string> = {
   openai: "OpenAI",
@@ -99,18 +101,6 @@ export type ProChatController = {
   setDocument(document: ProChatDocument | null): void;
   destroy(): void;
 };
-
-function required<T extends Element>(root: ParentNode, selector: string): T {
-  const value = root.querySelector<T>(selector);
-  if (!value) throw new Error(`missing chat element: ${selector}`);
-  return value;
-}
-
-function oneLine(error: unknown): string {
-  const value = error instanceof Error ? error.message : String(error);
-  return value.replace(/[\r\n\t]+/g, " ").trim().slice(0, 180) ||
-    "The provider request failed.";
-}
 
 function provider(value: unknown): ProProvider | null {
   return value === "openai" || value === "anthropic" ? value : null;
@@ -372,27 +362,27 @@ export function installProChat(
   root: Document,
   options: Options = {},
 ): ProChatController {
-  const panel = required<HTMLElement>(root, "#pro-chat");
-  const providerSelect = required<HTMLSelectElement>(panel, "#pro-chat-provider");
-  const modelSelect = required<HTMLSelectElement>(panel, "#pro-chat-model");
-  const thinkingSelect = required<HTMLSelectElement>(panel, "#pro-chat-thinking");
-  const retry = required<HTMLButtonElement>(panel, "#pro-chat-retry");
-  const storageNotice = required<HTMLElement>(panel, "#pro-chat-storage-notice");
-  const documentLabel = required<HTMLElement>(panel, "#pro-chat-document");
-  const messagesElement = required<HTMLOListElement>(panel, "#pro-chat-messages");
-  const empty = required<HTMLElement>(panel, "#pro-chat-empty");
-  const error = required<HTMLElement>(panel, "#pro-chat-error");
-  const form = required<HTMLFormElement>(panel, "#pro-chat-form");
-  const input = required<HTMLTextAreaElement>(panel, "#pro-chat-input");
-  const send = required<HTMLButtonElement>(panel, "#pro-chat-send");
-  const newChat = required<HTMLButtonElement>(panel, "#pro-chat-new");
-  const captureFocus = required<HTMLButtonElement>(panel, "#pro-chat-focus-capture");
-  const focus = required<HTMLElement>(panel, "#pro-chat-focus");
-  const focusLabel = required<HTMLElement>(panel, "#pro-chat-focus-text");
-  const removeFocus = required<HTMLButtonElement>(panel, "#pro-chat-focus-remove");
-  const attach = required<HTMLButtonElement>(panel, "#pro-chat-attach");
-  const attachmentInput = required<HTMLInputElement>(panel, "#pro-chat-attachment-input");
-  const attachmentList = required<HTMLUListElement>(panel, "#pro-chat-attachments");
+  const panel = required<HTMLElement>(root, "#pro-chat", "chat");
+  const providerSelect = required<HTMLSelectElement>(panel, "#pro-chat-provider", "chat");
+  const modelSelect = required<HTMLSelectElement>(panel, "#pro-chat-model", "chat");
+  const thinkingSelect = required<HTMLSelectElement>(panel, "#pro-chat-thinking", "chat");
+  const retry = required<HTMLButtonElement>(panel, "#pro-chat-retry", "chat");
+  const storageNotice = required<HTMLElement>(panel, "#pro-chat-storage-notice", "chat");
+  const documentLabel = required<HTMLElement>(panel, "#pro-chat-document", "chat");
+  const messagesElement = required<HTMLOListElement>(panel, "#pro-chat-messages", "chat");
+  const empty = required<HTMLElement>(panel, "#pro-chat-empty", "chat");
+  const error = required<HTMLElement>(panel, "#pro-chat-error", "chat");
+  const form = required<HTMLFormElement>(panel, "#pro-chat-form", "chat");
+  const input = required<HTMLTextAreaElement>(panel, "#pro-chat-input", "chat");
+  const send = required<HTMLButtonElement>(panel, "#pro-chat-send", "chat");
+  const newChat = required<HTMLButtonElement>(panel, "#pro-chat-new", "chat");
+  const captureFocus = required<HTMLButtonElement>(panel, "#pro-chat-focus-capture", "chat");
+  const focus = required<HTMLElement>(panel, "#pro-chat-focus", "chat");
+  const focusLabel = required<HTMLElement>(panel, "#pro-chat-focus-text", "chat");
+  const removeFocus = required<HTMLButtonElement>(panel, "#pro-chat-focus-remove", "chat");
+  const attach = required<HTMLButtonElement>(panel, "#pro-chat-attach", "chat");
+  const attachmentInput = required<HTMLInputElement>(panel, "#pro-chat-attachment-input", "chat");
+  const attachmentList = required<HTMLUListElement>(panel, "#pro-chat-attachments", "chat");
   const bridge = options.bridge ?? null;
   const createRequestId = options.createRequestId ?? (() => crypto.randomUUID());
   const disposers: Array<() => void> = [];
@@ -690,7 +680,7 @@ export function installProChat(
       saveConversation();
     } catch (cause) {
       if (destroyed || generation !== requestGeneration) return;
-      setError(oneLine(cause));
+      setError(oneLine(cause, "The provider request failed."));
       retry.hidden = false;
     } finally {
       if (!destroyed && generation === requestGeneration) {
@@ -776,7 +766,7 @@ export function installProChat(
       if (
         !destroyed && generation === attachmentGeneration &&
         currentDocument?.id === documentId
-      ) setError(oneLine(cause));
+      ) setError(oneLine(cause, "The provider request failed."));
     } finally {
       if (
         !destroyed && generation === attachmentGeneration &&
@@ -876,7 +866,7 @@ export function installProChat(
     } catch (cause) {
       if (!destroyed && generation === requestGeneration) {
         input.value = message;
-        setError(oneLine(cause));
+        setError(oneLine(cause, "The provider request failed."));
       }
     } finally {
       if (!destroyed && generation === requestGeneration) {
@@ -939,7 +929,7 @@ export function installProChat(
       options.onNotice?.("Suggestion added for review.");
     } catch (cause) {
       if (!destroyed && generation === requestGeneration) {
-        setError(`Could not create suggestion: ${oneLine(cause)}`);
+        setError(`Could not create suggestion: ${oneLine(cause, "The provider request failed.")}`);
         options.onNotice?.("Could not create the suggestion.", "error");
       }
     } finally {

@@ -7,7 +7,6 @@
  * daemon for connected-app credentials. This window holds no state of its own.
  */
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { PROVIDER_KEYS_CHANGED_STORAGE_KEY } from "./ai-support";
 import { safeLocalStorage, writeItem } from "./storage";
 import { EditorApi } from "./editor-api";
@@ -32,34 +31,16 @@ import {
   writeToolbarPosition,
   type ToolbarPosition,
 } from "./toolbar-position";
+import { required } from "./dom";
+import { installToast, oneLine } from "./notices";
+import { isTauri, nativeWindow as getNativeWindow } from "./tauri";
 
 type Connection = { mcp_url: string; token: string; stdio_command: string };
 
 const storage = safeLocalStorage();
-const isTauri = Boolean(
-  (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__,
-);
-const nativeWindow = isTauri ? getCurrentWindow() : null;
-
-function required<T extends Element>(selector: string): T {
-  const value = document.querySelector<T>(selector);
-  if (!value) throw new Error(`missing settings element: ${selector}`);
-  return value;
-}
-
-const toast = required<HTMLElement>("#toast");
-let toastTimer: number | null = null;
-function notify(message: string, kind: "info" | "error" = "info") {
-  toast.textContent = message;
-  toast.dataset.kind = kind;
-  toast.hidden = false;
-  if (toastTimer !== null) clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => (toast.hidden = true), kind === "error" ? 6000 : 2600);
-}
-
-function reason(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+const nativeWindow = getNativeWindow();
+const notify = installToast(required<HTMLElement>(document, "#toast", "settings"));
+const reason = (error: unknown) => oneLine(error, "unknown error");
 
 // ---------------------------------------------------------------- appearance
 
@@ -149,15 +130,15 @@ function announcingBridge(bridge: ProProviderBridge): ProProviderBridge {
 }
 
 installProProvider(document, {
-  bridge: isTauri ? announcingBridge(tauriProProviderBridge()) : null,
+  bridge: isTauri() ? announcingBridge(tauriProProviderBridge()) : null,
   onNotice: notify,
 });
 
 // ---------------------------------------------------------------- connected apps
 
-const scope = required<HTMLSelectElement>("#reviewer-scope");
-const documentField = required<HTMLElement>("#reviewer-document-field");
-const documentSelect = required<HTMLSelectElement>("#reviewer-document");
+const scope = required<HTMLSelectElement>(document, "#reviewer-scope", "settings");
+const documentField = required<HTMLElement>(document, "#reviewer-document-field", "settings");
+const documentSelect = required<HTMLSelectElement>(document, "#reviewer-document", "settings");
 let documents: DocumentSummary[] = [];
 
 const reviewers = installReviewerConnections(document, {
@@ -197,12 +178,12 @@ scope.addEventListener("change", renderDocumentField);
 documentSelect.addEventListener("change", selectDocument);
 // The form toggles scope programmatically when it opens; follow it.
 new MutationObserver(renderDocumentField).observe(
-  required<HTMLFormElement>("#reviewer-form"),
+  required<HTMLFormElement>(document, "#reviewer-form", "settings"),
   { attributes: true, attributeFilter: ["hidden"] },
 );
 
 async function connectReviewers() {
-  if (!isTauri) {
+  if (!isTauri()) {
     notify("Open Settings through the native app to manage connected apps.", "error");
     return;
   }

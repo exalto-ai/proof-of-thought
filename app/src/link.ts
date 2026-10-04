@@ -13,6 +13,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeClipboardText } from "./clipboard";
 import { ICONS, icon, type IconNode } from "./icons";
 import { accel } from "./keys";
+import { isTauri } from "./tauri";
 
 export type LinkController = {
   /** Open the link field for a selection or the link under the cursor. */
@@ -60,10 +61,7 @@ function readableHref(href: string): string {
 }
 
 async function openDestination(href: string): Promise<void> {
-  const tauri = Boolean(
-    (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__,
-  );
-  if (tauri) {
+  if (isTauri()) {
     await openUrl(href);
     return;
   }

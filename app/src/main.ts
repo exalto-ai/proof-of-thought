@@ -3,7 +3,6 @@
  * platform accelerator and K.
  */
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow as tauriWindow } from "@tauri-apps/api/window";
 import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import type { Editor } from "@tiptap/core";
@@ -31,6 +30,8 @@ import {
   suggestionPositionAtSelection,
   type SuggestionReviewController,
 } from "./suggestions";
+import { installToast, oneLine } from "./notices";
+import { isTauri, nativeWindow } from "./tauri";
 
 type Connection = {
   sync_url: string;
@@ -77,27 +78,10 @@ let closingAfterAutosave = false;
  * errors, `boot` only wrote into the title, and everything else surfaced as
  * nothing at all — a green status dot above a window that was quietly wrong.
  */
-let toastTimer: number | null = null;
+const notify = installToast(els.toast);
+const reason = (error: unknown) => oneLine(error, "unknown error", 160);
 
-function notify(message: string, kind: "info" | "error" = "info") {
-  els.toast.textContent = message;
-  els.toast.dataset.kind = kind;
-  els.toast.hidden = false;
-  if (toastTimer !== null) clearTimeout(toastTimer);
-  // Errors linger; confirmations do not.
-  toastTimer = window.setTimeout(
-    () => (els.toast.hidden = true),
-    kind === "error" ? 6000 : 2600,
-  );
-}
-
-/** Whatever an unknown throw carries, said in one line. */
-function reason(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error);
-  return text.length > 160 ? `${text.slice(0, 157)}…` : text;
-}
-
-installTheme(safeLocalStorage(), getCurrentWindow());
+installTheme(safeLocalStorage(), nativeWindow());
 installToolbarPosition(safeLocalStorage());
 
 const aiSupport = installAiSupport(document, {
@@ -202,7 +186,7 @@ function deriveTitle(editor: Editor): string {
 function refreshTitle(editor: Editor) {
   const title = deriveTitle(editor);
   document.title = title;
-  void getCurrentWindow?.()?.setTitle(title);
+  void nativeWindow()?.setTitle(title);
   if (open?.editor === editor && openDocId) {
     const current = open;
     aiSupport.setCurrentDocument({
@@ -860,21 +844,10 @@ async function boot() {
   await installNativeCloseGuard();
 }
 
-/** Only under Tauri; in a dev browser there is no native window to title. */
-function getCurrentWindow() {
-  return isTauri() ? tauriWindow() : null;
-}
-
-function isTauri(): boolean {
-  return Boolean(
-    (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__,
-  );
-}
-
 async function installNativeCloseGuard(): Promise<void> {
-  const nativeWindow = getCurrentWindow();
-  if (!nativeWindow) return;
-  await nativeWindow.onCloseRequested(async (event) => {
+  const target = nativeWindow();
+  if (!target) return;
+  await target.onCloseRequested(async (event) => {
     const provider = open?.provider;
     if (!provider?.hasPendingChanges) return;
 
@@ -895,7 +868,7 @@ async function installNativeCloseGuard(): Promise<void> {
 
       // `destroy` skips a second close-request event after the durability
       // barrier has passed.
-      await nativeWindow.destroy();
+      await target.destroy();
     } catch (error) {
       notify(`Could not close window: ${reason(error)}`, "error");
     } finally {

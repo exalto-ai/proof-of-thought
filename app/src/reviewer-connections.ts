@@ -7,6 +7,7 @@ import {
   type ReviewerClient,
 } from "./reviewer-setup";
 import { writeClipboardText } from "./clipboard";
+import { required } from "./dom";
 
 export type ReviewerAccess = {
   document_scope: "current" | "all";
@@ -64,33 +65,27 @@ export type ReviewerController = {
   destroy(): void;
 };
 
-function required<T extends Element>(root: ParentNode, selector: string): T {
-  const value = root.querySelector<T>(selector);
-  if (!value) throw new Error(`missing reviewer element: ${selector}`);
-  return value;
-}
-
 export function installReviewerConnections(
   root: Document,
   options: Options = {},
 ): ReviewerController {
-  const add = required<HTMLButtonElement>(root, "#reviewer-add");
-  const checkStatus = required<HTMLButtonElement>(root, "#reviewer-refresh");
-  const list = required<HTMLUListElement>(root, "#reviewer-list");
-  const empty = required<HTMLElement>(root, "#reviewer-empty");
-  const error = required<HTMLElement>(root, "#reviewer-error");
-  const form = required<HTMLFormElement>(root, "#reviewer-form");
-  const formTitle = required<HTMLElement>(root, "#reviewer-form-title");
-  const client = required<HTMLSelectElement>(root, "#reviewer-client");
-  const label = required<HTMLInputElement>(root, "#reviewer-label");
-  const scope = required<HTMLSelectElement>(root, "#reviewer-scope");
-  const cancel = required<HTMLButtonElement>(root, "#reviewer-cancel");
-  const setup = required<HTMLElement>(root, "#reviewer-setup");
-  const setupText = required<HTMLElement>(root, "#reviewer-setup-text");
-  const setupName = required<HTMLElement>(root, "#reviewer-setup-name");
-  const setupCommand = required<HTMLElement>(root, "#reviewer-setup-command");
-  const copy = required<HTMLButtonElement>(root, "#reviewer-copy");
-  const setupDone = required<HTMLButtonElement>(root, "#reviewer-setup-done");
+  const add = required<HTMLButtonElement>(root, "#reviewer-add", "reviewer");
+  const checkStatus = required<HTMLButtonElement>(root, "#reviewer-refresh", "reviewer");
+  const list = required<HTMLUListElement>(root, "#reviewer-list", "reviewer");
+  const empty = required<HTMLElement>(root, "#reviewer-empty", "reviewer");
+  const error = required<HTMLElement>(root, "#reviewer-error", "reviewer");
+  const form = required<HTMLFormElement>(root, "#reviewer-form", "reviewer");
+  const formTitle = required<HTMLElement>(root, "#reviewer-form-title", "reviewer");
+  const client = required<HTMLSelectElement>(root, "#reviewer-client", "reviewer");
+  const label = required<HTMLInputElement>(root, "#reviewer-label", "reviewer");
+  const scope = required<HTMLSelectElement>(root, "#reviewer-scope", "reviewer");
+  const cancel = required<HTMLButtonElement>(root, "#reviewer-cancel", "reviewer");
+  const setup = required<HTMLElement>(root, "#reviewer-setup", "reviewer");
+  const setupText = required<HTMLElement>(root, "#reviewer-setup-text", "reviewer");
+  const setupName = required<HTMLElement>(root, "#reviewer-setup-name", "reviewer");
+  const setupCommand = required<HTMLElement>(root, "#reviewer-setup-command", "reviewer");
+  const copy = required<HTMLButtonElement>(root, "#reviewer-copy", "reviewer");
+  const setupDone = required<HTMLButtonElement>(root, "#reviewer-setup-done", "reviewer");
   const copyText = options.copyText ?? writeClipboardText;
   const confirmAction = options.confirmAction ?? ((message: string) => window.confirm(message));
   const disposers: Array<() => void> = [];
