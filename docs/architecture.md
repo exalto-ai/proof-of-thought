@@ -949,7 +949,7 @@ state.
 
 System sans throughout, sized and spaced for long-form writing. The editor and window use
 the fixed deep-blue `#0c1622` ground shared with the app icon. A compact, centered toolbar
-provides New, Import Markdown, Export Markdown, local zoom, persistent block style, font
+provides New, local zoom, persistent block style, font
 size, bold, italic, and link commands. Clicking linked text opens an action card with
 explicit open, copy, edit, and remove commands instead of navigating immediately. ⌘N
 creates a blank document in its own window, visibly cascaded from and leaving the current
@@ -966,6 +966,7 @@ selected and used only inside native Rust commands. Markdown input rules give Be
 feel (`## ` → heading) without markdown storage (AD-3).
 
 **Cost:** every import creates a new document and every export asks for a destination.
+Import and export are keyboard-only (⌘O, ⌘S) so the toolbar stays limited to writing.
 Closing does not offer export because the CRDT store is authoritative and a Markdown copy
 must not be mistaken for a mirrored working file.
 

@@ -46,8 +46,6 @@ function toolbarOptions(overrides: Partial<ToolbarOptions> = {}): ToolbarOptions
   return {
     openLink: vi.fn(() => true),
     newDocument: vi.fn(),
-    importMarkdown: vi.fn(),
-    exportMarkdown: vi.fn(),
     subscribeSaveStatus: (listener) => {
       listener("saved");
       return vi.fn();
@@ -254,18 +252,16 @@ describe("installed toolbar", () => {
     cleanup();
   });
 
-  it("routes new, import, and export file commands from icon buttons", () => {
+  it("routes the new document command and leaves Markdown files to shortcuts", () => {
     const actions = toolbarOptions();
     const { editor, element } = makeEditor();
     const cleanup = installToolbar(editor, element, actions);
 
     document.querySelector<HTMLButtonElement>('[aria-label="New document"]')!.click();
-    document.querySelector<HTMLButtonElement>('[aria-label="Import Markdown file"]')!.click();
-    document.querySelector<HTMLButtonElement>('[aria-label="Export Markdown copy"]')!.click();
 
     expect(actions.newDocument).toHaveBeenCalledOnce();
-    expect(actions.importMarkdown).toHaveBeenCalledOnce();
-    expect(actions.exportMarkdown).toHaveBeenCalledOnce();
+    expect(document.querySelector('[aria-label="Import Markdown file"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Export Markdown copy"]')).toBeNull();
     cleanup();
   });
 

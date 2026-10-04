@@ -129,8 +129,6 @@ export function applyBlockStyle(editor: Editor, style: BlockStyle): boolean {
 export type ToolbarOptions = {
   openLink: () => boolean;
   newDocument: () => void | Promise<void>;
-  importMarkdown: () => void | Promise<void>;
-  exportMarkdown: () => void | Promise<void>;
   subscribeSaveStatus: (listener: (status: SaveStatus) => void) => () => void;
 };
 
@@ -154,16 +152,6 @@ export function installToolbar(
     "New document",
     icon(ICONS.filePlus),
     "is-icon is-new-document",
-  );
-  const importMarkdown = buttonControl(
-    "Import Markdown file",
-    icon(ICONS.folderOpen),
-    "is-icon is-open-markdown",
-  );
-  const exportMarkdown = buttonControl(
-    "Export Markdown copy",
-    icon(ICONS.save),
-    "is-icon is-export-markdown",
   );
 
   const zoom = selectControl("Editor zoom", "zoom-select");
@@ -227,8 +215,6 @@ export function installToolbar(
 
   toolbar.append(
     newDocument,
-    importMarkdown,
-    exportMarkdown,
     divider(),
     zoom,
     divider(),
@@ -283,8 +269,6 @@ export function installToolbar(
     update();
   });
   newDocument.addEventListener("click", () => void actions.newDocument());
-  importMarkdown.addEventListener("click", () => void actions.importMarkdown());
-  exportMarkdown.addEventListener("click", () => void actions.exportMarkdown());
   bold.addEventListener("click", () => editor.chain().focus().toggleBold().run());
   italic.addEventListener("click", () => editor.chain().focus().toggleItalic().run());
   link.addEventListener("click", () => actions.openLink());

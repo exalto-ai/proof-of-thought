@@ -352,10 +352,6 @@ async function openDocument(docId: string): Promise<boolean> {
     user,
     {
       newDocument: createNewDocument,
-      importMarkdown: importMarkdownFile,
-      exportMarkdown: async () => {
-        await exportMarkdownFile();
-      },
     },
     () => !aiSupport.isOpen(),
   );
