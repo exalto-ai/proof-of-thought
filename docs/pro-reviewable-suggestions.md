@@ -3,8 +3,12 @@
 Built-in chat changes the note only through three edit tools offered to the model:
 `replace_block`, `insert_blocks`, and `delete_block`. The note is sent as numbered blocks (`b1`,
 `b2`, …), and the tools address those numbers. The native side resolves each call to a block
-index and the block's Markdown as sent. A call it cannot read is dropped. There is one model turn
-per message: tool calls are the answer, and no results are sent back.
+index and the block's Markdown as sent. A call it cannot read is dropped. After each round of tool
+calls, the native side tells the model which ones it recorded ("Shown to the user in the note")
+and which it could not read, and the model continues, for at most four rounds. That is how one
+reply can both edit and say what it did, or ask about the part it could not do. The result does
+not wait for the daemon, so an edit the daemon later refuses is still reported as shown; the
+window reports that refusal itself.
 
 The window waits for current editor changes to save, maps each index to the block's stable id,
 and sends each edit to the daemon as its own pending suggestion. Edits to an existing block carry
