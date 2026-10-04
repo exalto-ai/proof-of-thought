@@ -373,20 +373,6 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .doc-list-empty[hidden] { display: none; }
 #doc-sidebar-toggle { left: var(--window-buttons-end); }
 #ai-support-toggle { right: 10px; }
-.ai-sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  /* The AI toggle is pinned over this strip's right end. */
-  padding: 0 52px 0 16px;
-}
-.ai-sidebar h2 {
-  margin: 0;
-  color: var(--ink-soft);
-  font: 600 12px/1.2 var(--sans);
-  letter-spacing: 0.02em;
-}
 .ai-sidebar h3 {
   margin: 0;
   color: var(--ink-soft);

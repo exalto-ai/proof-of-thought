@@ -46,10 +46,7 @@ export function installAiSupport(
   const setupPanel = required<HTMLElement>(root, "#ai-chat-setup", "AI sidebar");
   const chatPanel = required<HTMLElement>(root, "#pro-chat", "AI sidebar");
   const providerSelect = required<HTMLSelectElement>(root, "#pro-chat-provider", "AI sidebar");
-  const settingsButtons = [
-    required<HTMLButtonElement>(root, "#ai-open-settings", "AI sidebar"),
-    required<HTMLButtonElement>(root, "#ai-chat-setup-open", "AI sidebar"),
-  ];
+  const openSettings = required<HTMLButtonElement>(root, "#ai-chat-setup-open", "AI sidebar");
   const disposers: Array<() => void> = [];
   const chat = installProChat(root, {
     bridge: options.chatBridge,
@@ -114,9 +111,7 @@ export function installAiSupport(
     render();
   }
 
-  for (const button of settingsButtons) {
-    listen(button, "click", () => void options.openSettings?.());
-  }
+  listen(openSettings, "click", () => void options.openSettings?.());
   listen(window, "focus", () => void refreshProviders());
   listen(window, "storage", (event) => {
     if ((event as StorageEvent).key === PROVIDER_KEYS_CHANGED_STORAGE_KEY) {

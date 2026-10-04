@@ -52,11 +52,8 @@
       </div>
 
       <div class="side-panel-resizer" id="ai-sidebar-resizer" role="separator" aria-orientation="vertical" aria-controls="ai-support-sidebar" aria-label="Resize AI sidebar" tabindex="0" hidden></div>
-      <aside class="side-panel ai-sidebar" id="ai-support-sidebar" data-side-panel aria-labelledby="ai-support-title" tabindex="-1" hidden>
-        <header class="ai-sidebar-header titlebar" data-tauri-drag-region>
-          <h2 id="ai-support-title">AI</h2>
-          <button class="text-button" id="ai-open-settings" type="button">Settings</button>
-        </header>
+      <aside class="side-panel ai-sidebar" id="ai-support-sidebar" data-side-panel aria-label="AI" tabindex="-1" hidden>
+        <div class="titlebar" data-tauri-drag-region></div>
 
         <section class="ai-chat-setup" id="ai-chat-setup" hidden>
           <p>Add an OpenAI or Anthropic key in Settings to chat about this document.</p>
