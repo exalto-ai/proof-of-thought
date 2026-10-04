@@ -720,10 +720,16 @@ button.pro-chat-change:focus-visible {
 .proof {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding: 10px 16px 14px;
   overflow-y: auto;
   font-size: 12px;
 }
+/* Centred in the pane when it fits; scrolls from the top when it does not. */
+.proof > * { flex: none; }
+.proof > :first-child { margin-top: auto; }
+.proof > :last-child { margin-bottom: auto; }
 .proof-status { margin: 0 0 8px; color: var(--ink-soft); }
 .proof-chart { position: relative; }
 .proof-share { height: 150px; }
