@@ -24,6 +24,10 @@ export const ICONS = {
     ["path", { d: "M9 15h6" }],
     ["path", { d: "M12 18v-6" }],
   ],
+  panelRight: [
+    ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
+    ["path", { d: "M15 3v18" }],
+  ],
   globe: [
     ["circle", { cx: "12", cy: "12", r: "10" }],
     ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" }],

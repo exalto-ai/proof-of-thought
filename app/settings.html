@@ -24,6 +24,84 @@
           </div>
         </div>
       </section>
+
+      <section class="settings-section provider-settings" id="provider-settings" aria-labelledby="provider-settings-title">
+        <h2 id="provider-settings-title">Built-in chat</h2>
+        <p class="settings-note">Add a key to chat about the current document from the AI sidebar. Keys stay in your Mac login Keychain, and adding one sends no document text. Provider API charges apply to each request.</p>
+        <p class="reviewer-error" id="provider-error" role="alert" hidden></p>
+        <ul class="settings-group provider-list">
+          <li class="settings-row" data-provider="openai">
+            <div><strong>OpenAI</strong><span data-provider-status>No key</span></div>
+            <div class="reviewer-actions">
+              <button type="button" data-provider-remove hidden>Remove</button>
+              <button class="ghost" type="button" data-provider-configure>Add key</button>
+            </div>
+          </li>
+          <li class="settings-row" data-provider="anthropic">
+            <div><strong>Anthropic</strong><span data-provider-status>No key</span></div>
+            <div class="reviewer-actions">
+              <button type="button" data-provider-remove hidden>Remove</button>
+              <button class="ghost" type="button" data-provider-configure>Add key</button>
+            </div>
+          </li>
+        </ul>
+        <p class="settings-note">Proof of Thought records the selected provider, model, thinking setting, and visible exchange. Accepted wording is still labeled as reported AI output.</p>
+      </section>
+
+      <section class="settings-section" aria-labelledby="connected-apps-title">
+        <div class="settings-section-heading">
+          <h2 id="connected-apps-title">Connected apps</h2>
+          <div class="reviewer-heading-actions">
+            <button class="text-button" id="reviewer-refresh" type="button">Check status</button>
+            <button class="ghost" id="reviewer-add" type="button">Add app</button>
+          </div>
+        </div>
+        <p class="settings-note">Let ChatGPT desktop, Codex, Claude Desktop, or Claude Code read your documents and propose changes. Each proposal appears in the document with Accept and Reject. Connecting adds no separate API charge. The app and model are recorded as reported by the connected tool, not as provider-verified identity.</p>
+        <p id="reviewer-error" class="reviewer-error" role="alert" hidden></p>
+        <p id="reviewer-empty" class="settings-empty">No connected apps yet.</p>
+        <ul id="reviewer-list" class="settings-group reviewer-list"></ul>
+
+        <form id="reviewer-form" class="settings-group reviewer-form" hidden>
+          <h3 id="reviewer-form-title">Add app</h3>
+          <label>AI app
+            <select id="reviewer-client">
+              <option value="chatgpt">ChatGPT desktop</option>
+              <option value="codex">Codex</option>
+              <option value="claude-desktop">Claude Desktop</option>
+              <option value="claude-code">Claude Code</option>
+            </select>
+          </label>
+          <label>Name
+            <input id="reviewer-label" maxlength="80" required autocomplete="off" />
+          </label>
+          <label>Documents
+            <select id="reviewer-scope">
+              <option value="all">All documents</option>
+              <option value="current">One document</option>
+            </select>
+          </label>
+          <label id="reviewer-document-field" hidden>Document
+            <select id="reviewer-document"></select>
+          </label>
+          <p id="reviewer-current" class="settings-note" hidden></p>
+          <p class="settings-note">This app can read the selected documents and propose changes for you to accept or reject. It may send document text to its own provider.</p>
+          <div class="reviewer-actions">
+            <button id="reviewer-cancel" type="button">Cancel</button>
+            <button class="ghost" type="submit">Save</button>
+          </div>
+        </form>
+
+        <section id="reviewer-setup" class="settings-group reviewer-setup" hidden>
+          <h3>Finish connecting</h3>
+          <p id="reviewer-setup-text" class="settings-note"></p>
+          <p id="reviewer-setup-name" class="reviewer-setup-name"></p>
+          <pre id="reviewer-setup-command"></pre>
+          <div class="reviewer-actions">
+            <button id="reviewer-setup-done" type="button">Done</button>
+            <button class="ghost" id="reviewer-copy" type="button">Copy setup</button>
+          </div>
+        </section>
+      </section>
     </main>
 
     <div class="toast" id="toast" role="status" hidden></div>

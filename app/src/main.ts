@@ -101,6 +101,10 @@ const aiSupport = installAiSupport(document, {
   providerBridge: isTauri() ? tauriProProviderBridge() : null,
   chatBridge: isTauri() ? tauriProChatBridge() : null,
   suggestChatResponse: (input) => editorApi.proposeChatSuggestion(input),
+  openSettings: () =>
+    invoke<void>("open_settings").catch((error) =>
+      notify(`Could not open Settings: ${reason(error)}`, "error"),
+    ),
   onNotice: notify,
 });
 
@@ -356,7 +360,6 @@ async function openDocument(docId: string): Promise<boolean> {
     {
       newDocument: createNewDocument,
     },
-    () => !aiSupport.isOpen(),
   );
   awareness.setLocalStateField("user", user);
 
@@ -838,8 +841,6 @@ async function boot() {
   connection = await loadConnection();
   mcp = new Mcp(connection.mcp_url, connection.token);
   editorApi = new EditorApi(connection.mcp_url, connection.token);
-  aiSupport.setReviewerApi(editorApi);
-  aiSupport.setConnectionCommand(connection.stdio_command);
   await mcp.connect();
 
   const documents = await mcp.listDocuments();
@@ -859,7 +860,6 @@ async function boot() {
   }
 
   await openDocument(targetId);
-  aiSupport.showOnboardingIfNeeded();
   if (requested) {
     // Keep the pin through all fallible startup work. A transient read or sync
     // failure must not turn Reload into a different document.

@@ -1,10 +1,19 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  AI_SUPPORT_PATH_STORAGE_KEY,
+  AI_SIDEBAR_OPEN_STORAGE_KEY,
+  AI_SIDEBAR_WIDTH_STORAGE_KEY,
+  PROVIDER_KEYS_CHANGED_STORAGE_KEY,
+  SIDEBAR_DEFAULT_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  clampSidebarWidth,
   installAiSupport,
-  readAiSupportPath,
-  writeAiSupportPath,
 } from "./ai-support";
+import type { ProProviderBridge, ProviderConfiguration } from "./pro-provider-bridge";
+
+const markup = readFileSync(resolve(import.meta.dirname, "../index.html"), "utf8");
+const body = markup.slice(markup.indexOf("<body>") + 6, markup.indexOf("</body>"));
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
   const values = new Map(Object.entries(initial));
@@ -20,52 +29,25 @@ function memoryStorage(initial: Record<string, string> = {}): Storage {
   };
 }
 
+function providers(configured: ProviderConfiguration["provider"][]): ProProviderBridge {
+  return {
+    list: vi.fn().mockResolvedValue(
+      (["openai", "anthropic"] as const).map((provider) => ({
+        provider,
+        configured: configured.includes(provider),
+      })),
+    ),
+    configure: vi.fn(),
+    remove: vi.fn(),
+  };
+}
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const sidebar = () => document.querySelector<HTMLElement>("#ai-support-sidebar")!;
+const toggle = () => document.querySelector<HTMLButtonElement>("#ai-support-toggle")!;
+
 beforeEach(() => {
-  document.body.innerHTML = `
-    <header><button id="ai-support-toggle" aria-expanded="false"></button></header>
-    <div id="editor"><div class="tiptap" tabindex="0"></div></div>
-    <aside id="ai-support-sidebar" hidden>
-      <h2 id="ai-support-title"></h2>
-      <button id="ai-sidebar-close"></button>
-      <p id="ai-mode-description"></p>
-      <button data-ai-mode="connected"></button>
-      <button data-ai-mode="builtin"></button>
-      <button data-ai-mode="basic"></button>
-      <section id="ai-connect-panel" hidden>
-        <button id="reviewer-add"></button>
-        <button id="reviewer-refresh"></button>
-        <p id="reviewer-error" hidden></p>
-        <p id="reviewer-empty"></p>
-        <ul id="reviewer-list"></ul>
-        <form id="reviewer-form" hidden>
-          <h3 id="reviewer-form-title"></h3>
-          <select id="reviewer-client"><option value="codex">Codex</option></select>
-          <input id="reviewer-label" />
-          <select id="reviewer-scope"><option value="current">Current</option><option value="all">All</option></select>
-          <p id="reviewer-current"></p>
-          <button id="reviewer-cancel" type="button"></button>
-        </form>
-        <section id="reviewer-setup" hidden>
-          <p id="reviewer-setup-text"></p>
-          <p id="reviewer-setup-name"></p>
-          <pre id="reviewer-setup-command"></pre>
-          <button id="reviewer-copy"></button>
-          <button id="reviewer-setup-done"></button>
-        </section>
-      </section>
-      <section id="ai-pro-panel" hidden></section>
-      <section id="ai-basic-panel" hidden></section>
-    </aside>
-    <div id="ai-onboarding" hidden>
-      <section role="dialog">
-        <button id="ai-onboarding-close"></button>
-        <h1 id="ai-onboarding-title" tabindex="-1"></h1>
-        <button data-ai-mode="connected">Connect</button>
-        <button data-ai-mode="builtin">Built in</button>
-        <button data-ai-mode="basic">Basic</button>
-      </section>
-    </div>
-  `;
+  document.body.innerHTML = body;
 });
 
 afterEach(() => {
@@ -73,154 +55,127 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("AI support paths", () => {
-  it("waits for successful document startup before showing first-launch choice", async () => {
-    const storage = memoryStorage();
-    const controller = installAiSupport(document, { storage });
-    const onboarding = document.querySelector<HTMLElement>("#ai-onboarding")!;
-
-    expect(onboarding.hidden).toBe(true);
-    document.querySelector<HTMLButtonElement>("#ai-support-toggle")!.click();
-    expect(onboarding.hidden).toBe(true);
-    expect(controller.showOnboardingIfNeeded()).toBe(true);
-    await Promise.resolve();
-
-    expect(onboarding.hidden).toBe(false);
-    expect(controller.isOpen()).toBe(true);
-    expect(document.activeElement).toBe(
-      document.querySelector("#ai-onboarding-title"),
-    );
-    expect(document.querySelector("header")!.hasAttribute("inert")).toBe(true);
-    controller.destroy();
-  });
-
-  it("persists the connected path and opens its setup without changing permissions", async () => {
-    const storage = memoryStorage();
-    const controller = installAiSupport(document, { storage });
-    controller.showOnboardingIfNeeded();
-
-    document
-      .querySelector<HTMLButtonElement>(
-        "#ai-onboarding [data-ai-mode='connected']",
-      )!
-      .click();
-    await Promise.resolve();
-
-    expect(controller.path()).toBe("connected");
-    expect(controller.isOpen()).toBe(true);
-    expect(document.querySelector<HTMLElement>("#ai-connect-panel")!.hidden).toBe(
-      false,
-    );
-    expect(readAiSupportPath(storage)).toBe("connected");
-    expect(document.querySelector("[inert]")).toBeNull();
-    controller.destroy();
-  });
-
-  it("returns to the editor when basic is chosen", async () => {
+describe("AI sidebar", () => {
+  it("is open by default with no mode chooser", () => {
     const controller = installAiSupport(document, { storage: memoryStorage() });
-    controller.showOnboardingIfNeeded();
-    document
-      .querySelector<HTMLButtonElement>("#ai-onboarding [data-ai-mode='basic']")!
-      .click();
-    await Promise.resolve();
 
-    expect(controller.path()).toBe("basic");
-    expect(controller.isOpen()).toBe(false);
-    expect(document.activeElement).toBe(document.querySelector(".tiptap"));
+    expect(controller.isOpen()).toBe(true);
+    expect(sidebar().hidden).toBe(false);
+    expect(toggle().getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector("[data-ai-mode]")).toBeNull();
+    expect(document.querySelector("#ai-onboarding")).toBeNull();
     controller.destroy();
   });
 
-  it("skips onboarding when a preference already exists", () => {
-    const storage = memoryStorage({
-      [AI_SUPPORT_PATH_STORAGE_KEY]: JSON.stringify({
-        version: 1,
-        path: "builtin",
-      }),
+  it("is shown and hidden only by the toggle, which remembers the choice", () => {
+    const storage = memoryStorage();
+    const controller = installAiSupport(document, { storage });
+
+    expect(document.querySelector("#ai-sidebar-close")).toBeNull();
+    toggle().click();
+    expect(controller.isOpen()).toBe(false);
+    expect(sidebar().hidden).toBe(true);
+    expect(storage.getItem(AI_SIDEBAR_OPEN_STORAGE_KEY)).toBe("false");
+    controller.destroy();
+
+    const reopened = installAiSupport(document, { storage });
+    expect(reopened.isOpen()).toBe(false);
+    toggle().click();
+    expect(reopened.isOpen()).toBe(true);
+    expect(storage.getItem(AI_SIDEBAR_OPEN_STORAGE_KEY)).toBe("true");
+    reopened.destroy();
+  });
+
+  it("returns focus to the editor on Escape without hiding the sidebar", () => {
+    const controller = installAiSupport(document, { storage: memoryStorage() });
+    const editor = document.createElement("div");
+    editor.className = "tiptap";
+    editor.tabIndex = 0;
+    document.querySelector("#editor")!.append(editor);
+    sidebar().focus();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(controller.isOpen()).toBe(true);
+    expect(document.activeElement).toBe(editor);
+    controller.destroy();
+  });
+
+  it("points to Settings until a provider key exists", async () => {
+    const openSettings = vi.fn();
+    const controller = installAiSupport(document, {
+      storage: memoryStorage(),
+      providerBridge: providers([]),
+      openSettings,
     });
-    const controller = installAiSupport(document, { storage });
+    await flush();
 
-    expect(controller.path()).toBe("builtin");
-    expect(controller.showOnboardingIfNeeded()).toBe(false);
-    expect(document.querySelector<HTMLElement>("#ai-onboarding")!.hidden).toBe(
-      true,
-    );
+    expect(document.querySelector<HTMLElement>("#ai-chat-setup")!.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>("#pro-chat")!.hidden).toBe(true);
+    document.querySelector<HTMLButtonElement>("#ai-chat-setup-open")!.click();
+    expect(openSettings).toHaveBeenCalledOnce();
     controller.destroy();
   });
 
-  it("treats corrupt or unavailable storage as an unset preference", () => {
-    const corrupt = memoryStorage({ [AI_SUPPORT_PATH_STORAGE_KEY]: "not json" });
-    expect(readAiSupportPath(corrupt)).toBeNull();
-    expect(writeAiSupportPath(null, "connected")).toBe(false);
+  it("shows chat for configured providers and picks the only one", async () => {
+    const controller = installAiSupport(document, {
+      storage: memoryStorage(),
+      providerBridge: providers(["anthropic"]),
+    });
+    await flush();
 
-    const unavailable: Storage = {
-      ...memoryStorage(),
-      setItem: () => {
-        throw new Error("denied");
-      },
-    };
-    expect(writeAiSupportPath(unavailable, "basic")).toBe(false);
-  });
-
-  it("keeps the existing non-blocking sidebar close behavior", async () => {
-    const storage = memoryStorage();
-    writeAiSupportPath(storage, "connected");
-    const controller = installAiSupport(document, { storage });
-    const toggle = document.querySelector<HTMLButtonElement>("#ai-support-toggle")!;
-    toggle.click();
-    await Promise.resolve();
-
-    expect(controller.isOpen()).toBe(true);
-    expect(document.activeElement).toBe(
-      document.querySelector("#ai-sidebar-close"),
-    );
-    document.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
-    expect(controller.isOpen()).toBe(false);
-    expect(document.activeElement).toBe(toggle);
+    const select = document.querySelector<HTMLSelectElement>("#pro-chat-provider")!;
+    expect(document.querySelector<HTMLElement>("#ai-chat-setup")!.hidden).toBe(true);
+    expect(document.querySelector<HTMLElement>("#pro-chat")!.hidden).toBe(false);
+    expect(select.querySelector<HTMLOptionElement>('[value="openai"]')!.disabled).toBe(true);
+    expect(select.value).toBe("anthropic");
     controller.destroy();
   });
 
-  it("keeps focus on the mode control when switching inside the sidebar", async () => {
-    const storage = memoryStorage();
-    writeAiSupportPath(storage, "connected");
-    const controller = installAiSupport(document, { storage });
-    document.querySelector<HTMLButtonElement>("#ai-support-toggle")!.click();
-    await Promise.resolve();
-    const basic = document.querySelector<HTMLButtonElement>(
-      "#ai-support-sidebar [data-ai-mode='basic']",
-    )!;
-    basic.focus();
-    basic.click();
-    await Promise.resolve();
+  it("re-checks keys when Settings announces a change", async () => {
+    const bridge = providers([]);
+    const controller = installAiSupport(document, {
+      storage: memoryStorage(),
+      providerBridge: bridge,
+    });
+    await flush();
+    vi.mocked(bridge.list).mockResolvedValue([
+      { provider: "openai", configured: true },
+      { provider: "anthropic", configured: false },
+    ]);
 
-    expect(controller.path()).toBe("basic");
-    expect(controller.isOpen()).toBe(true);
-    expect(document.activeElement).toBe(basic);
-    controller.destroy();
-  });
-
-  it("restores focus when another window supplies the saved path", async () => {
-    const storage = memoryStorage();
-    const controller = installAiSupport(document, { storage });
-    controller.showOnboardingIfNeeded();
-    await Promise.resolve();
-    expect(document.activeElement).toBe(
-      document.querySelector("#ai-onboarding-title"),
-    );
-
-    writeAiSupportPath(storage, "connected");
     window.dispatchEvent(
-      new StorageEvent("storage", { key: AI_SUPPORT_PATH_STORAGE_KEY }),
+      new StorageEvent("storage", { key: PROVIDER_KEYS_CHANGED_STORAGE_KEY }),
     );
-    await Promise.resolve();
-
-    expect(controller.path()).toBe("connected");
-    expect(controller.isOpen()).toBe(false);
-    expect(document.querySelector<HTMLElement>("#ai-onboarding")!.hidden).toBe(
-      true,
-    );
-    expect(document.activeElement).toBe(document.querySelector(".tiptap"));
+    await flush();
+    expect(document.querySelector<HTMLElement>("#pro-chat")!.hidden).toBe(false);
     controller.destroy();
+  });
+
+  it("resizes from the keyboard and persists the width", () => {
+    const storage = memoryStorage();
+    const controller = installAiSupport(document, { storage });
+    const resizer = document.querySelector<HTMLElement>("#ai-sidebar-resizer")!;
+    vi.spyOn(sidebar().parentElement!, "getBoundingClientRect").mockReturnValue(
+      { width: 1200 } as DOMRect,
+    );
+
+    resizer.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    expect(storage.getItem(AI_SIDEBAR_WIDTH_STORAGE_KEY)).toBe(
+      String(SIDEBAR_DEFAULT_WIDTH + 16),
+    );
+    expect(sidebar().style.getPropertyValue("--ai-sidebar-width")).toBe(
+      `${SIDEBAR_DEFAULT_WIDTH + 16}px`,
+    );
+    expect(resizer.getAttribute("aria-valuenow")).toBe(String(SIDEBAR_DEFAULT_WIDTH + 16));
+    controller.destroy();
+  });
+});
+
+describe("sidebar width", () => {
+  it("never squeezes the editor or the sidebar below their minimums", () => {
+    expect(clampSidebarWidth(100, 1200)).toBe(SIDEBAR_MIN_WIDTH);
+    expect(clampSidebarWidth(2000, 1200)).toBe(720);
+    expect(clampSidebarWidth(600, 900)).toBe(480);
+    expect(clampSidebarWidth(600, 500)).toBe(SIDEBAR_MIN_WIDTH);
   });
 });

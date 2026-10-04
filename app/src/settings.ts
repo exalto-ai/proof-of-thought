@@ -1,13 +1,22 @@
 /**
- * The app-wide Settings window. Opened from Proof of Thought → Settings… (⌘,);
- * there is only ever one.
+ * The app-wide Settings window. Opened from Proof of Thought → Settings… (⌘,)
+ * or from the AI sidebar; there is only ever one.
  *
- * Preferences here live in shared local storage, so open document windows
- * follow a change through the `storage` event. This window holds no state of
- * its own.
+ * Every preference here either lives in shared local storage (theme) or in an
+ * authority that already exists — the login Keychain for provider keys and the
+ * daemon for connected-app credentials. This window holds no state of its own.
  */
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { safeLocalStorage } from "./ai-support";
+import { PROVIDER_KEYS_CHANGED_STORAGE_KEY, safeLocalStorage } from "./ai-support";
+import { EditorApi } from "./editor-api";
+import { Mcp, type DocumentSummary } from "./mcp";
+import { installProProvider } from "./pro-provider";
+import {
+  tauriProProviderBridge,
+  type ProProviderBridge,
+} from "./pro-provider-bridge";
+import { installReviewerConnections } from "./reviewer-connections";
 import {
   applyTheme,
   installTheme,
@@ -16,6 +25,8 @@ import {
   writeTheme,
   type ThemePreference,
 } from "./theme";
+
+type Connection = { mcp_url: string; token: string; stdio_command: string };
 
 const storage = safeLocalStorage(window);
 const isTauri = Boolean(
@@ -37,6 +48,10 @@ function notify(message: string, kind: "info" | "error" = "info") {
   toast.hidden = false;
   if (toastTimer !== null) clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => (toast.hidden = true), kind === "error" ? 6000 : 2600);
+}
+
+function reason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 // ---------------------------------------------------------------- theme
@@ -82,3 +97,105 @@ for (const [index, button] of themeButtons.entries()) {
 }
 renderTheme(readTheme(storage));
 window.addEventListener("storage", () => renderTheme(readTheme(storage)));
+
+// ---------------------------------------------------------------- provider keys
+
+/** Tell open document windows to re-check which providers have a key. */
+function announceProviderChange() {
+  try {
+    storage?.setItem(PROVIDER_KEYS_CHANGED_STORAGE_KEY, String(Date.now()));
+  } catch {
+    // Document windows also re-check when they regain focus.
+  }
+}
+
+function announcingBridge(bridge: ProProviderBridge): ProProviderBridge {
+  return {
+    list: () => bridge.list(),
+    configure: (provider) =>
+      bridge.configure(provider).finally(announceProviderChange),
+    remove: (provider) => bridge.remove(provider).finally(announceProviderChange),
+  };
+}
+
+const providers = installProProvider(document, {
+  bridge: isTauri ? announcingBridge(tauriProProviderBridge()) : null,
+  onNotice: notify,
+});
+providers.setActive(true);
+
+// ---------------------------------------------------------------- connected apps
+
+const scope = required<HTMLSelectElement>("#reviewer-scope");
+const documentField = required<HTMLElement>("#reviewer-document-field");
+const documentSelect = required<HTMLSelectElement>("#reviewer-document");
+let documents: DocumentSummary[] = [];
+
+const reviewers = installReviewerConnections(document, {
+  onNotice: notify,
+  defaultScope: "all",
+  onEditDocument(documentId) {
+    if (documentId && documents.some((value) => value.doc_id === documentId)) {
+      documentSelect.value = documentId;
+      selectDocument();
+    }
+  },
+});
+
+function selectDocument() {
+  const chosen = documents.find((value) => value.doc_id === documentSelect.value);
+  reviewers.setDocument(
+    chosen ? { id: chosen.doc_id, title: chosen.title } : null,
+  );
+}
+
+function renderDocumentField() {
+  documentField.hidden = scope.value !== "current";
+}
+
+function renderDocuments() {
+  documentSelect.replaceChildren(
+    ...documents.map((value) => {
+      const option = document.createElement("option");
+      option.value = value.doc_id;
+      option.textContent = value.title || "Untitled";
+      return option;
+    }),
+  );
+  selectDocument();
+}
+
+scope.addEventListener("change", renderDocumentField);
+documentSelect.addEventListener("change", selectDocument);
+// The form toggles scope programmatically when it opens; follow it.
+new MutationObserver(renderDocumentField).observe(
+  required<HTMLFormElement>("#reviewer-form"),
+  { attributes: true, attributeFilter: ["hidden"] },
+);
+
+async function connectReviewers() {
+  if (!isTauri) {
+    notify("Open Settings through the native app to manage connected apps.", "error");
+    return;
+  }
+  try {
+    const connection = await invoke<Connection>("connection");
+    const mcp = new Mcp(connection.mcp_url, connection.token);
+    reviewers.setApi(new EditorApi(connection.mcp_url, connection.token));
+    reviewers.setExecutable(connection.stdio_command);
+    reviewers.setOpen(true);
+    await mcp.connect();
+    documents = await mcp.listDocuments();
+    renderDocuments();
+  } catch (error) {
+    notify(`Could not reach the daemon: ${reason(error)}`, "error");
+  }
+}
+
+renderDocumentField();
+void connectReviewers();
+
+// Re-check status whenever Settings comes back to the front.
+window.addEventListener("focus", () => {
+  reviewers.setOpen(true);
+});

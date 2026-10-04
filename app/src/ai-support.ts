@@ -1,57 +1,37 @@
-import { writeClipboardText } from "./clipboard";
+import { ICONS, icon } from "./icons";
 import type { ChatSuggestionInput } from "./editor-api";
-import type { ProProviderBridge } from "./pro-provider-bridge";
+import type { ProProvider, ProProviderBridge } from "./pro-provider-bridge";
 import type { ProChatBridge } from "./pro-chat-bridge";
 import { installProChat, type ProChatDocument } from "./pro-chat";
-import { installProProvider } from "./pro-provider";
-import {
-  installReviewerConnections,
-  type ReviewerApi,
-} from "./reviewer-connections";
 
-export const AI_SUPPORT_PATH_STORAGE_KEY = "thought.ai-support-path.v1";
+export const AI_SIDEBAR_OPEN_STORAGE_KEY = "thought.ai-sidebar-open.v1";
+export const AI_SIDEBAR_WIDTH_STORAGE_KEY = "thought.ai-sidebar-width.v1";
+/** Settings bumps this after a key changes so open windows re-check. */
+export const PROVIDER_KEYS_CHANGED_STORAGE_KEY = "thought.provider-keys-changed";
 
-export type AiSupportPath = "connected" | "builtin" | "basic";
-
-function isAiSupportPath(value: unknown): value is AiSupportPath {
-  return value === "connected" || value === "builtin" || value === "basic";
-}
-
-type StoredPreference = {
-  version: 1;
-  path: AiSupportPath;
-};
+export const SIDEBAR_MIN_WIDTH = 280;
+export const SIDEBAR_DEFAULT_WIDTH = 360;
+const SIDEBAR_MAX_WIDTH = 720;
+/** The editor keeps at least this much room when the sidebar is dragged wide. */
+const EDITOR_MIN_WIDTH = 420;
+const KEYBOARD_STEP = 16;
 
 type AiSupportOptions = {
   storage?: Storage | null;
-  copyText?: (text: string) => Promise<void>;
-  reviewerApi?: ReviewerApi | null;
   providerBridge?: ProProviderBridge | null;
   chatBridge?: ProChatBridge | null;
   suggestChatResponse?: (input: ChatSuggestionInput) => Promise<unknown>;
+  openSettings?: () => void | Promise<void>;
   onNotice?: (message: string, kind?: "info" | "error") => void;
 };
 
 export type AiSupportController = {
   isOpen(): boolean;
-  path(): AiSupportPath | null;
-  isChoosingPath(): boolean;
-  showOnboardingIfNeeded(): boolean;
-  setConnectionCommand(command: string): void;
-  setReviewerApi(api: ReviewerApi | null): void;
   setCurrentDocument(context: ProChatDocument | null): void;
+  refreshProviders(): Promise<void>;
   open(): void;
   close(): void;
   destroy(): void;
-};
-
-const pathDescriptions: Record<AiSupportPath, string> = {
-  connected:
-    "Use an AI app you already have. Its proposals appear in the document for you to accept or reject.",
-  builtin:
-    "Chat inside Proof of Thought with your own provider key, then turn useful answers into reviewable suggestions.",
-  basic:
-    "Use local recording without built-in chat. Existing external reviewers keep their access until you remove them.",
 };
 
 function required<T extends Element>(root: ParentNode, selector: string): T {
@@ -70,37 +50,55 @@ export function safeLocalStorage(target: {
   }
 }
 
-export function readAiSupportPath(storage: Storage | null): AiSupportPath | null {
-  if (storage === null) return null;
+function readItem(storage: Storage | null, key: string): string | null {
   try {
-    const raw = storage.getItem(AI_SUPPORT_PATH_STORAGE_KEY);
-    if (!raw) return null;
-    const value = JSON.parse(raw) as Partial<StoredPreference>;
-    if (value.version !== 1) return null;
-    return isAiSupportPath(value.path) ? value.path : null;
+    return storage?.getItem(key) ?? null;
   } catch {
     return null;
   }
 }
 
-export function writeAiSupportPath(
-  storage: Storage | null,
-  path: AiSupportPath,
-): boolean {
-  if (storage === null) return false;
+function writeItem(storage: Storage | null, key: string, value: string) {
   try {
-    const value: StoredPreference = { version: 1, path };
-    storage.setItem(AI_SUPPORT_PATH_STORAGE_KEY, JSON.stringify(value));
-    return true;
+    storage?.setItem(key, value);
   } catch {
-    return false;
+    // View preferences that fail to persist reset to their defaults.
   }
 }
 
+/** The sidebar starts open unless this user last closed it. */
+export function readSidebarOpen(storage: Storage | null): boolean {
+  return readItem(storage, AI_SIDEBAR_OPEN_STORAGE_KEY) !== "false";
+}
+
+export function clampSidebarWidth(width: number, available: number): number {
+  const max = Math.max(
+    SIDEBAR_MIN_WIDTH,
+    Math.min(SIDEBAR_MAX_WIDTH, available - EDITOR_MIN_WIDTH),
+  );
+  return Math.round(Math.min(max, Math.max(SIDEBAR_MIN_WIDTH, width)));
+}
+
+export function readSidebarWidth(storage: Storage | null): number {
+  const value = Number(readItem(storage, AI_SIDEBAR_WIDTH_STORAGE_KEY));
+  return Number.isFinite(value) && value > 0 ? value : SIDEBAR_DEFAULT_WIDTH;
+}
+
+function sidebarToggleIcon(): SVGSVGElement {
+  const svg = icon(ICONS.panelRight);
+  // Filled when the sidebar is showing, so the state reads at a glance rather
+  // than only through a background tint.
+  const fill = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  fill.setAttribute("class", "panel-fill");
+  fill.setAttribute("d", "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4z");
+  svg.prepend(fill);
+  return svg;
+}
+
 /**
- * Own the shared sidebar and first-launch path chooser. The selected path is a
- * presentation preference only. Reviewer credentials and permissions remain
- * owned by the daemon and are never stored here.
+ * Own the document window's AI sidebar: visibility, width, and whether chat
+ * is available. Provider keys and connected apps are configured in Settings;
+ * this only reads whether a key exists, never the key itself.
  */
 export function installAiSupport(
   root: Document,
@@ -109,123 +107,98 @@ export function installAiSupport(
   const storage = options.storage === undefined
     ? safeLocalStorage(window)
     : options.storage;
-  const copyText = options.copyText ?? writeClipboardText;
   const toggle = required<HTMLButtonElement>(root, "#ai-support-toggle");
+  toggle.replaceChildren(sidebarToggleIcon());
+  toggle.setAttribute("aria-label", "AI sidebar");
   const sidebar = required<HTMLElement>(root, "#ai-support-sidebar");
-  const closeButton = required<HTMLButtonElement>(root, "#ai-sidebar-close");
-  const title = required<HTMLElement>(root, "#ai-support-title");
-  const description = required<HTMLElement>(root, "#ai-mode-description");
-  const connectedPanel = required<HTMLElement>(root, "#ai-connect-panel");
-  const builtinPanel = required<HTMLElement>(root, "#ai-pro-panel");
-  const basicPanel = required<HTMLElement>(root, "#ai-basic-panel");
-  const onboarding = required<HTMLElement>(root, "#ai-onboarding");
-  const onboardingDialog = required<HTMLElement>(onboarding, '[role="dialog"]');
-  const onboardingTitle = required<HTMLElement>(onboarding, "#ai-onboarding-title");
-  const onboardingClose = required<HTMLButtonElement>(
-    onboarding,
-    "#ai-onboarding-close",
-  );
-  const pathButtons = [
-    ...root.querySelectorAll<HTMLButtonElement>("[data-ai-mode]"),
+  const resizer = required<HTMLElement>(root, "#ai-sidebar-resizer");
+  const setupPanel = required<HTMLElement>(root, "#ai-chat-setup");
+  const chatPanel = required<HTMLElement>(root, "#pro-chat");
+  const providerSelect = required<HTMLSelectElement>(root, "#pro-chat-provider");
+  const settingsButtons = [
+    required<HTMLButtonElement>(root, "#ai-open-settings"),
+    required<HTMLButtonElement>(root, "#ai-chat-setup-open"),
   ];
   const disposers: Array<() => void> = [];
-  const backgroundBlockedElements = new Set<HTMLElement>();
-  const reviewers = installReviewerConnections(root, {
-    api: options.reviewerApi,
-    copyText,
+  const chat = installProChat(root, {
+    bridge: options.chatBridge,
+    suggestResponse: options.suggestChatResponse,
     onNotice: options.onNotice,
   });
-  const chat = root.querySelector("#pro-chat")
-    ? installProChat(root, {
-        bridge: options.chatBridge,
-        suggestResponse: options.suggestChatResponse,
-        onNotice: options.onNotice,
-      })
-    : null;
-  const providers = root.querySelector("#provider-settings")
-    ? installProProvider(root, {
-        bridge: options.providerBridge,
-        onNotice: options.onNotice,
-      })
-    : null;
-  let currentPath = readAiSupportPath(storage);
-  let sidebarOpen = false;
-  let onboardingOpen = false;
-  let onboardingReady = false;
-  let returnFocus: HTMLElement | null = null;
+  let sidebarOpen = readSidebarOpen(storage);
+  let width = readSidebarWidth(storage);
+  let configured = new Set<ProProvider>();
+  let providersKnown = false;
+  let providerRequest = 0;
 
-  function listen<K extends keyof DocumentEventMap>(
-    target: Document,
-    event: K,
-    listener: (event: DocumentEventMap[K]) => void,
-  ): void;
-  function listen<K extends keyof HTMLElementEventMap>(
-    target: HTMLElement,
-    event: K,
-    listener: (event: HTMLElementEventMap[K]) => void,
-  ): void;
-  function listen<K extends keyof WindowEventMap>(
-    target: Window,
-    event: K,
-    listener: (event: WindowEventMap[K]) => void,
-  ): void;
   function listen(
-    target: Document | HTMLElement | Window,
+    target: EventTarget,
     event: string,
-    listener: EventListener,
+    listener: (event: Event) => void,
   ) {
     target.addEventListener(event, listener);
     disposers.push(() => target.removeEventListener(event, listener));
   }
 
-  function setBackgroundBlocked(blocked: boolean) {
-    if (blocked) {
-      for (const element of root.body.children) {
-        if (element === onboarding || !(element instanceof HTMLElement)) continue;
-        if (!element.hasAttribute("inert")) {
-          element.setAttribute("inert", "");
-          backgroundBlockedElements.add(element);
-        }
-      }
-      return;
-    }
-    for (const element of backgroundBlockedElements) {
-      element.removeAttribute("inert");
-    }
-    backgroundBlockedElements.clear();
+  function availableWidth(): number {
+    return sidebar.parentElement?.getBoundingClientRect().width || window.innerWidth;
+  }
+
+  function applyWidth(next: number, persist: boolean) {
+    width = clampSidebarWidth(next, availableWidth());
+    sidebar.style.setProperty("--ai-sidebar-width", `${width}px`);
+    resizer.setAttribute("aria-valuemin", String(SIDEBAR_MIN_WIDTH));
+    resizer.setAttribute("aria-valuemax", String(clampSidebarWidth(Infinity, availableWidth())));
+    resizer.setAttribute("aria-valuenow", String(width));
+    if (persist) writeItem(storage, AI_SIDEBAR_WIDTH_STORAGE_KEY, String(width));
+    // Provenance rails measure editor geometry, which this just changed.
+    window.dispatchEvent(new Event("resize"));
+  }
+
+  /** With one configured provider there is nothing to choose. */
+  function preferConfiguredProvider() {
+    if (providerSelect.value !== "" || configured.size !== 1) return;
+    providerSelect.value = [...configured][0];
+    providerSelect.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
   function render() {
-    const path = currentPath;
-    const connected = path === "connected";
-    const builtin = path === "builtin";
-    connectedPanel.hidden = !connected;
-    builtinPanel.hidden = !builtin;
-    basicPanel.hidden = path !== "basic";
-    description.textContent = path === null
-      ? "Choose the level of AI support you want."
-      : pathDescriptions[path];
-    title.textContent = connected
-      ? "Connected app"
-      : builtin
-        ? "Built-in AI"
-        : path === "basic"
-          ? "Basic recording"
-          : "Choose how to work";
-    for (const button of pathButtons) {
-      const selected = button.dataset.aiMode === path;
-      button.setAttribute("aria-pressed", String(selected));
+    const hasKey = configured.size > 0;
+    for (const option of providerSelect.options) {
+      if (option.value) option.disabled = !configured.has(option.value as ProProvider);
     }
-    toggle.dataset.mode = path ?? "unconfigured";
     toggle.setAttribute("aria-expanded", String(sidebarOpen));
+    toggle.title = sidebarOpen ? "Hide AI sidebar" : "Show AI sidebar";
     sidebar.hidden = !sidebarOpen;
-    onboarding.hidden = !onboardingOpen;
-    onboardingClose.hidden = currentPath === null;
-    setBackgroundBlocked(onboardingOpen);
-    reviewers.setOpen(sidebarOpen && connected);
-    chat?.setActive(sidebarOpen && builtin);
-    providers?.setActive(sidebarOpen && builtin);
-    root.documentElement.dataset.aiSupportPath = path ?? "unconfigured";
+    resizer.hidden = !sidebarOpen;
+    setupPanel.hidden = !providersKnown || hasKey;
+    chatPanel.hidden = !hasKey;
+    chat.setActive(sidebarOpen && hasKey);
+    if (sidebarOpen && hasKey) preferConfiguredProvider();
+  }
+
+  async function refreshProviders() {
+    const bridge = options.providerBridge;
+    const request = ++providerRequest;
+    if (!bridge) {
+      configured = new Set();
+      providersKnown = true;
+      render();
+      return;
+    }
+    try {
+      const values = await bridge.list();
+      if (request !== providerRequest) return;
+      configured = new Set(
+        values.filter((value) => value.configured).map((value) => value.provider),
+      );
+      providersKnown = true;
+      render();
+    } catch {
+      if (request !== providerRequest) return;
+      providersKnown = true;
+      render();
+    }
   }
 
   function focusEditorOrToggle() {
@@ -233,142 +206,101 @@ export function installAiSupport(
     (editor ?? toggle).focus();
   }
 
-  function closeOnboarding() {
-    if (!onboardingOpen || currentPath === null) return;
-    onboardingOpen = false;
-    render();
-    const target = returnFocus;
-    returnFocus = null;
-    (target ?? toggle).focus();
-  }
-
-  function choosePath(path: AiSupportPath, fromOnboarding: boolean) {
-    currentPath = path;
-    if (!writeAiSupportPath(storage, path)) {
-      options.onNotice?.(
-        "This choice works now, but Proof of Thought could not save it for the next launch.",
-        "error",
-      );
-    }
-    onboardingOpen = false;
-    if (fromOnboarding) sidebarOpen = path !== "basic";
-    render();
-    if (fromOnboarding) {
-      queueMicrotask(() => {
-        if (sidebarOpen) closeButton.focus();
-        else focusEditorOrToggle();
-      });
-    }
-  }
-
   function open() {
-    if (onboardingOpen) return;
-    if (currentPath === null) {
-      if (onboardingReady) showOnboardingIfNeeded();
-      return;
-    }
+    if (sidebarOpen) return;
     sidebarOpen = true;
+    writeItem(storage, AI_SIDEBAR_OPEN_STORAGE_KEY, "true");
     render();
-    queueMicrotask(() => closeButton.focus());
+    applyWidth(width, false);
   }
 
   function close() {
     if (!sidebarOpen) return;
+    const hadFocus = sidebar.contains(root.activeElement);
     sidebarOpen = false;
+    writeItem(storage, AI_SIDEBAR_OPEN_STORAGE_KEY, "false");
     render();
-    toggle.focus();
-  }
-
-  function showOnboardingIfNeeded(): boolean {
-    onboardingReady = true;
-    if (currentPath !== null || onboardingOpen) return false;
-    returnFocus = root.activeElement instanceof HTMLElement
-      ? root.activeElement
-      : null;
-    onboardingOpen = true;
-    sidebarOpen = false;
-    render();
-    queueMicrotask(() => {
-      onboardingDialog.scrollTop = 0;
-      onboardingTitle.focus({ preventScroll: true });
-    });
-    return true;
+    window.dispatchEvent(new Event("resize"));
+    if (hadFocus) toggle.focus();
   }
 
   listen(toggle, "click", () => (sidebarOpen ? close() : open()));
-  listen(closeButton, "click", close);
-  listen(onboardingClose, "click", closeOnboarding);
-  listen(onboarding, "mousedown", (event) => {
-    if (event.target === onboarding) closeOnboarding();
-  });
-  for (const button of pathButtons) {
-    const value = button.dataset.aiMode;
-    if (!isAiSupportPath(value)) continue;
-    listen(button, "click", () => choosePath(value, onboarding.contains(button)));
+  for (const button of settingsButtons) {
+    listen(button, "click", () => void options.openSettings?.());
   }
+
+  let dragStart: { x: number; width: number } | null = null;
+  listen(resizer, "pointerdown", (event) => {
+    const pointer = event as PointerEvent;
+    if (pointer.button !== 0) return;
+    pointer.preventDefault();
+    dragStart = { x: pointer.clientX, width };
+    resizer.setPointerCapture?.(pointer.pointerId);
+    root.documentElement.classList.add("is-resizing-sidebar");
+  });
+  listen(resizer, "pointermove", (event) => {
+    if (!dragStart) return;
+    const pointer = event as PointerEvent;
+    // The sidebar is on the right: dragging left widens it.
+    applyWidth(dragStart.width + dragStart.x - pointer.clientX, false);
+  });
+  const endDrag = () => {
+    if (!dragStart) return;
+    dragStart = null;
+    root.documentElement.classList.remove("is-resizing-sidebar");
+    applyWidth(width, true);
+  };
+  listen(resizer, "pointerup", endDrag);
+  listen(resizer, "pointercancel", endDrag);
+  listen(resizer, "dblclick", () => applyWidth(SIDEBAR_DEFAULT_WIDTH, true));
+  listen(resizer, "keydown", (event) => {
+    const key = (event as KeyboardEvent).key;
+    if (key === "ArrowLeft") applyWidth(width + KEYBOARD_STEP, true);
+    else if (key === "ArrowRight") applyWidth(width - KEYBOARD_STEP, true);
+    else return;
+    event.preventDefault();
+  });
+  listen(window, "resize", () => {
+    if (!sidebarOpen) return;
+    const next = clampSidebarWidth(width, availableWidth());
+    if (next !== width) {
+      width = next;
+      sidebar.style.setProperty("--ai-sidebar-width", `${width}px`);
+    }
+  });
+
+  listen(window, "focus", () => void refreshProviders());
   listen(window, "storage", (event) => {
-    if (event.key !== AI_SUPPORT_PATH_STORAGE_KEY) return;
-    const path = readAiSupportPath(storage);
-    if (path === null) return;
-    const focused = root.activeElement;
-    const hidFocusedSurface = focused instanceof Node &&
-      (onboarding.contains(focused) || sidebar.contains(focused));
-    currentPath = path;
-    onboardingOpen = false;
-    sidebarOpen = false;
-    render();
-    if (hidFocusedSurface) queueMicrotask(focusEditorOrToggle);
+    if ((event as StorageEvent).key === PROVIDER_KEYS_CHANGED_STORAGE_KEY) {
+      void refreshProviders();
+    }
   });
   listen(root, "keydown", (event) => {
-    if (event.key === "Escape") {
-      if (onboardingOpen) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        closeOnboarding();
-      } else if (sidebarOpen) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        close();
-      }
-      return;
-    }
-    if (!onboardingOpen || event.key !== "Tab") return;
-    const controls = [
-      ...onboarding.querySelectorAll<HTMLElement>(
-        "button:not([disabled]):not([hidden]), summary, a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
-      ),
-    ];
-    if (controls.length === 0) return;
-    const current = controls.indexOf(root.activeElement as HTMLElement);
-    const next = event.shiftKey
-      ? (current <= 0 ? controls.length : current) - 1
-      : (current + 1) % controls.length;
+    if ((event as KeyboardEvent).key !== "Escape") return;
+    if (!sidebarOpen || !sidebar.contains(root.activeElement)) return;
+    // The toggle owns visibility; Escape only hands focus back to writing.
     event.preventDefault();
-    controls[next].focus();
+    event.stopImmediatePropagation();
+    focusEditorOrToggle();
   });
 
   render();
+  applyWidth(width, false);
+  void refreshProviders();
 
   return {
-    isOpen: () => sidebarOpen || onboardingOpen,
-    path: () => currentPath,
-    isChoosingPath: () => onboardingOpen,
-    showOnboardingIfNeeded,
-    setConnectionCommand: reviewers.setExecutable,
-    setReviewerApi: reviewers.setApi,
+    isOpen: () => sidebarOpen,
     setCurrentDocument(context) {
-      reviewers.setDocument(context);
-      chat?.setDocument(context);
+      chat.setDocument(context);
+      if (sidebarOpen && configured.size > 0) preferConfiguredProvider();
     },
+    refreshProviders,
     open,
     close,
     destroy() {
       for (const dispose of disposers.splice(0)) dispose();
-      reviewers.destroy();
-      chat?.destroy();
-      providers?.destroy();
-      setBackgroundBlocked(false);
-      delete root.documentElement.dataset.aiSupportPath;
+      chat.destroy();
+      root.documentElement.classList.remove("is-resizing-sidebar");
     },
   };
 }

@@ -51,6 +51,10 @@ type Options = {
   copyText?: (text: string) => Promise<void>;
   confirmAction?: (message: string) => boolean;
   onNotice?: (message: string, kind?: "info" | "error") => void;
+  /** Scope for a new connection; otherwise the current document when one is set. */
+  defaultScope?: ReviewerAccess["document_scope"];
+  /** Lets a document picker follow the connection being edited. */
+  onEditDocument?: (documentId: string | null) => void;
 };
 
 export type ReviewerController = {
@@ -131,7 +135,9 @@ export function installReviewerConnections(
     client.disabled = Boolean(connection);
     client.value = connection?.client ?? "chatgpt";
     label.value = connection?.display_label ?? "";
-    scope.value = connection?.access.document_scope ?? (documentContext ? "current" : "all");
+    if (connection) options.onEditDocument?.(connection.access.document_id);
+    scope.value = connection?.access.document_scope ??
+      options.defaultScope ?? (documentContext ? "current" : "all");
     renderDocument();
     setup.hidden = true;
     form.hidden = false;
@@ -169,7 +175,7 @@ export function installReviewerConnections(
         const activity = document.createElement("small");
         const actions = document.createElement("div");
         title.textContent = connection.display_label;
-        meta.textContent = `${reviewerClientName(connection.client)} · ${connection.access.document_scope === "all" ? "All documents" : "Current document"}`;
+        meta.textContent = `${reviewerClientName(connection.client)} · ${connection.access.document_scope === "all" ? "All documents" : "One document"}`;
         activity.textContent = reviewerActivity(connection);
         details.append(title, meta, activity);
         actions.className = "reviewer-actions";

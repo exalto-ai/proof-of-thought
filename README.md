@@ -57,7 +57,7 @@ the editor you are already using, and each new window is visibly cascaded from i
 ⌘W closes the window without prompting because Proof of Thought's CRDT store remains
 authoritative. Export is an explicit one-time action and never establishes a mirrored file.
 
-The daemon can also be run on its own. Add reviewers from the AI support sidebar. Each saved
+The daemon can also be run on its own. Add reviewers under Connected apps in Settings (⌘,). Each saved
 connection gets its own read-only credential and current-document or all-document scope:
 
 ```bash

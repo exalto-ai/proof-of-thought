@@ -931,21 +931,24 @@ adjacency is why both belong to the same milestone.
 ## M2.5 — The window
 
 Each document has its own native window. ⌘K opens a switcher backed by the daemon's FTS index,
-the same `search` the agents use, so there is one search implementation rather than two. An
-optional right sidebar holds agent and proof controls without interrupting startup or changing
-how a document opens.
+the same `search` the agents use, so there is one search implementation rather than two. A
+right sidebar, open by default and resizable by dragging its border, holds built-in chat and the
+current text's recorded sources. A toolbar toggle is its only show/hide control, and the choice
+and width are remembered per machine.
 
-After the first document opens successfully, a one-time chooser presents Connected app,
-Built-in AI, and Basic recording as plain-language starting paths. The choice only selects which
-sidebar panel is shown. It never grants, revokes, or changes reviewer access, and saved external
-connections remain active until they are removed. Connected reviewer proposals and built-in chat
-wording both use the existing Accept/Reject suggestion flow by default.
+Configuration lives in one app-wide Settings window (Proof of Thought → Settings…, ⌘,):
+appearance, provider keys for built-in chat, and connected apps. The sidebar only asks whether a
+provider key exists; with none it points to Settings, and with exactly one it selects that
+provider. There are no AI modes and no first-launch chooser. Connected reviewer proposals and
+built-in chat wording both use the existing Accept/Reject suggestion flow by default. A connected
+app is scoped to all documents or to one document chosen in Settings.
 
-**Cost:** the sidebar reduces horizontal editing space while open and adds a focus region that
-must leave keyboard and assistive-technology navigation while closed. It is presentation only;
-the daemon and CRDT remain the document authority. The stored path preference can become stale,
-so every panel must describe current capabilities rather than treating the preference as access
-state.
+**Cost:** the sidebar reduces horizontal editing space by default, so the editor keeps a minimum
+width the drag cannot take. Settings and document windows share preferences through local storage
+and re-check provider keys on focus, so a window can briefly show stale availability until then.
+It is all presentation; the Keychain, the daemon, and the CRDT remain the authorities. Dropping the
+chooser removes the first-run explanation of the three paths; that copy now lives beside each
+setting it describes.
 
 System sans throughout, sized and spaced for long-form writing. The dark appearance uses the
 deep-blue `#0c1622` ground shared with the app icon; a sibling light palette exists, and one

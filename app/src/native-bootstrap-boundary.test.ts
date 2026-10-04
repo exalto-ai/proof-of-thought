@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const mainSource = readFileSync(resolve(import.meta.dirname, "main.ts"), "utf8");
+const settingsSource = readFileSync(resolve(import.meta.dirname, "settings.ts"), "utf8");
 const viteSource = readFileSync(
   resolve(import.meta.dirname, "../vite.config.ts"),
   "utf8",
@@ -19,5 +20,7 @@ describe("native daemon bootstrap boundary", () => {
   it("loads connection capabilities only through the native command", () => {
     expect(mainSource).toContain('invoke<Connection>("connection")');
     expect(mainSource).not.toContain('fetch("/__thought/connection")');
+    expect(settingsSource).toContain('invoke<Connection>("connection")');
+    expect(settingsSource).not.toContain('fetch("/__thought/connection")');
   });
 });
