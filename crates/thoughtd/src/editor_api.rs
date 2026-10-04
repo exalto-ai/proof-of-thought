@@ -116,6 +116,10 @@ pub fn routes(workspace: Arc<Workspace>, reviewers: Arc<ConnectionRegistry>) -> 
             get(list_suggestions),
         )
         .route(
+            "/editor/documents/{doc_id}/activity",
+            get(document_activity),
+        )
+        .route(
             "/editor/documents/{doc_id}/suggestions/pro-chat",
             post(create_chat_suggestion),
         )
@@ -186,6 +190,14 @@ async fn set_document_deleted(
         )
         .map_err(failed)?;
     Ok(Json(serde_json::to_value(outcome).map_err(failed)?))
+}
+
+async fn document_activity(
+    State(state): State<EditorState>,
+    Path(doc_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let events = state.workspace.document_activity(&doc_id).map_err(failed)?;
+    Ok(Json(serde_json::json!({ "events": events })))
 }
 
 async fn list_suggestions(

@@ -120,6 +120,18 @@ impl Daemon {
             .expect("editor response is json")
     }
 
+    pub fn editor_get(&self, path: &str) -> serde_json::Value {
+        let url = self.url.replace("/mcp", path);
+        self.agent
+            .get(&url)
+            .header("Authorization", &format!("Bearer {}", self.token))
+            .call()
+            .expect("editor request succeeded")
+            .body_mut()
+            .read_json()
+            .expect("editor response is json")
+    }
+
     /// The HTTP status of an editor request, for requests expected to fail.
     pub fn editor_post_status(&self, path: &str, body: serde_json::Value) -> u16 {
         let url = self.url.replace("/mcp", path);

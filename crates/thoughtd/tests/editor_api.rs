@@ -177,3 +177,36 @@ fn edit_mode_applies_chat_edits_directly_with_reported_attribution() {
     );
     assert_eq!(stale, 409);
 }
+
+#[test]
+fn activity_lists_each_change_with_who_made_it() {
+    let daemon = Daemon::start();
+    let created = daemon.editor_post(
+        "/editor/documents",
+        serde_json::json!({ "title": "Draft", "markdown": "Original text" }),
+    );
+    let doc_id = created["doc_id"].as_str().unwrap();
+    daemon.editor_post(
+        &format!("/editor/documents/{doc_id}/edits/pro-chat"),
+        serde_json::json!({
+            "request_id": "chat-request-3.0",
+            "provider": "chatgpt",
+            "requested_model": "gpt-plan",
+            "change": { "kind": "insert_blocks", "after": { "kind": "end" }, "markdown": "More" }
+        }),
+    );
+
+    let activity = daemon.editor_get(&format!("/editor/documents/{doc_id}/activity"));
+    let events = activity["events"].as_array().unwrap();
+    let summary = events
+        .iter()
+        .map(|event| {
+            (
+                event["kind"].as_str().unwrap(),
+                event["ingress"].as_str().unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(summary, [("human", "imported"), ("agent", "api")]);
+    assert!(events.iter().all(|event| event["at"].as_i64().unwrap() > 0));
+}

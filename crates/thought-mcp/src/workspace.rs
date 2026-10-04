@@ -180,6 +180,15 @@ pub struct BlockAttribution {
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
+pub struct ActivityEvent {
+    /// Milliseconds since the Unix epoch.
+    pub at: i64,
+    /// `human`, `agent`, or `unknown`.
+    pub kind: String,
+    pub ingress: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct EditOutcome {
     pub doc_id: String,
     pub block_id: Option<String>,
@@ -1162,6 +1171,35 @@ impl Workspace {
                     color: a.color,
                     last_seen: a.last_seen,
                     edits: a.edits,
+                })
+                .collect())
+        })
+    }
+
+    /// When the document changed and who changed it, for the window's stats:
+    /// one entry per recorded change, oldest first. Kinds are the actors'
+    /// own reported kinds; a change with no actor is `unknown`.
+    pub fn document_activity(&self, doc_id: &str) -> Result<Vec<ActivityEvent>, WorkspaceError> {
+        self.with(|inner| {
+            inner.doc(doc_id)?;
+            let kinds = inner
+                .store
+                .actors_for_document(doc_id)?
+                .into_iter()
+                .map(|actor| (actor.actor_id, actor.kind))
+                .collect::<HashMap<_, _>>();
+            Ok(inner
+                .store
+                .provenance_events(doc_id)?
+                .into_iter()
+                .map(|event| ActivityEvent {
+                    at: event.created_at,
+                    kind: event
+                        .actor_id
+                        .as_ref()
+                        .and_then(|actor| kinds.get(actor).cloned())
+                        .unwrap_or_else(|| "unknown".into()),
+                    ingress: event.ingress,
                 })
                 .collect())
         })

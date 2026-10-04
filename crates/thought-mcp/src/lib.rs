@@ -24,8 +24,8 @@ pub use suggestions::{
     DecisionOutcome, SuggestedChange, SuggestionError, SuggestionList, SuggestionOutcome,
 };
 pub use workspace::{
-    ActorRef, ActorSummary, BlockAttribution, BlockSpan, DocumentLineage, DocumentSummary,
-    DocumentView, EditOutcome, SearchHit, TextEdit, Workspace, WorkspaceError,
+    ActivityEvent, ActorRef, ActorSummary, BlockAttribution, BlockSpan, DocumentLineage,
+    DocumentSummary, DocumentView, EditOutcome, SearchHit, TextEdit, Workspace, WorkspaceError,
 };
 
 #[cfg(test)]
