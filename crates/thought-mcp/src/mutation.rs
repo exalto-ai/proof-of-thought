@@ -76,6 +76,18 @@ impl MutationContext {
         }
     }
 
+    /// A built-in chat edit applied directly, in a note set to Edit mode. Who
+    /// made it is reported by the window, not observed.
+    pub fn chat(label: impl Into<String>, connection_id: &str) -> Self {
+        Self {
+            ingress: Ingress::Api,
+            assurance: Assurance::Reported,
+            alignment: Alignment::Inferred,
+            group_key: format!("chat:connection:{connection_id}"),
+            source_label: label.into(),
+        }
+    }
+
     pub fn suggestion(label: impl Into<String>, connection_id: &str) -> Self {
         Self {
             ingress: Ingress::Suggestion,

@@ -89,7 +89,9 @@ const aiSupport = installAiSupport(document, {
   providerBridge: isTauri() ? tauriProProviderBridge() : null,
   chatBridge: isTauri() ? tauriProChatBridge() : null,
   suggestChatEdit: (input) => editorApi.proposeChatSuggestion(input),
+  applyChatEdit: (input) => editorApi.applyChatEdit(input),
   focusSuggestion: (suggestionId) => void focusSuggestion(suggestionId),
+  focusBlock: (blockId) => focusBlock(blockId),
   openSettings: () =>
     invoke<void>("open_settings").catch((error) =>
       notify(`Could not open Settings: ${reason(error)}`, "error"),
@@ -242,6 +244,22 @@ async function focusSuggestion(suggestionId: string) {
   if (open?.suggestions === suggestions && !suggestions.focus(suggestionId)) {
     notify("That suggestion was already accepted or rejected.");
   }
+}
+
+/** Put the caret at the start of a block chat edited, and bring it into view. */
+function focusBlock(blockId: string) {
+  if (!open) return;
+  const { editor, doc } = open;
+  const index = topLevelBlockIds(editor, doc).indexOf(blockId);
+  if (index < 0) {
+    notify("That part of the note is no longer there.");
+    return;
+  }
+  let position = 0;
+  editor.state.doc.forEach((_node, offset, at) => {
+    if (at === index) position = offset;
+  });
+  editor.chain().focus().setTextSelection(position + 1).scrollIntoView().run();
 }
 
 /** Show or hide one peer's caret label from outside the editor. */

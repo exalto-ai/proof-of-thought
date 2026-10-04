@@ -71,6 +71,21 @@ export class EditorApi implements ReviewerApi {
     );
   }
 
+  /** Apply a chat edit directly, for a note in Edit mode. */
+  applyChatEdit(input: ChatSuggestionInput): Promise<{ block_id: string | null }> {
+    return this.request(
+      "POST",
+      `/editor/documents/${encodeURIComponent(input.documentId)}/edits/pro-chat`,
+      {
+        request_id: input.requestId,
+        provider: input.provider,
+        requested_model: input.requestedModel,
+        reported_model: input.reportedModel,
+        change: input.change,
+      },
+    );
+  }
+
   acceptSuggestion(
     docId: string,
     suggestionId: string,

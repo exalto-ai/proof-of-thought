@@ -520,7 +520,7 @@ every window focus produced a stream of access prompts whenever the code signatu
 does on every development build. **Cost:** a secret now sits in app memory for the process
 lifetime rather than only during each request, and changing one secret rewrites them all.
 
-### AD-23: Visible chat persists locally and cannot edit
+### AD-23: Visible chat persists locally
 
 The window shows a clear sharing disclosure, then sends the current document projection and visible
 conversation to a selected built-in provider. It stores a bounded visible conversation for each
@@ -535,15 +535,15 @@ transform an attachment, and that visible response persists as ordinary AI chat.
 corruption, denial, or quota failure leaves the live in-window chat usable and reports that
 persistence is unavailable.
 
-Provider responses remain plain visible text; they do not enter the document or attribution log by
-themselves.
+Provider response text stays visible chat; it does not enter the document or attribution log by
+itself. Edits reach the note only through the tools in AD-24.
 
 **Cost:** local browser storage can be cleared, unavailable, or overwritten by another window, and
 history does not follow the document to another device. There is still no streaming or Stop. A
 failed request may have reached the provider even when the window receives no answer. Reviewable
 document changes remain a separate suggestion operation rather than an implicit power of chat.
 
-### AD-24 — Chat responses enter documents only through review
+### AD-24 — Chat responses enter documents through review, unless the note is in Edit mode
 
 Built-in chat edits the note through block-addressed tools (replace, insert, delete), and each
 edit is handed to the daemon as its own pending suggestion. The daemon refuses an edit whose
@@ -551,8 +551,18 @@ target block has changed since generation. Amended 2026-10-04: chat used to offe
 as an insertion, which could not shorten or rewrite existing text, and a whole-note wording check
 refused it after any edit anywhere. The cost is a second model contract to keep working across
 three providers' tool-call formats, and more suggestions per request to review. It uses the existing
-suggestion store and Accept/Reject flow; chat has no direct-write route. Provider and model labels
-are explicitly reported claims, not proof of upstream identity.
+suggestion store and Accept/Reject flow. Provider and model labels are explicitly reported claims,
+not proof of upstream identity.
+
+Amended 2026-10-04: a note's chat can be switched from Suggest to Edit, and then the same edits
+apply directly through `/editor/documents/{id}/edits/pro-chat`, attributed to the reported chat
+actor with `api` ingress. The choice is per note, kept in that device's window storage, never
+synced, and every note starts in Suggest. This departs from "direct write is a per-session grant"
+at the person's request: switching modes for every session of a note they edit with chat all day
+was friction with no matching safety. The same freshness check applies, so an edit to a block
+that has changed is refused rather than merged. Connected reviewers and MCP agents are unchanged.
+The cost is that a note left in Edit lets chat change wording without a review step, so the mode
+is shown in the composer on every message and the change is undone only by hand.
 
 **Cost:** the local window carries the visible response from native transport to the daemon rather
 than keeping a second native transcript. A modified window could alter a pending proposal, but it

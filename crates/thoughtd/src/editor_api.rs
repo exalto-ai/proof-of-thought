@@ -5,6 +5,7 @@ use axum::http::StatusCode;
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use std::sync::Arc;
+use thought_core::Position;
 use thought_mcp::{
     ActorRef, MutationContext, ReviewerAccess, ReviewerClient, SuggestedChange, Workspace,
 };
@@ -119,6 +120,10 @@ pub fn routes(workspace: Arc<Workspace>, reviewers: Arc<ConnectionRegistry>) -> 
             post(create_chat_suggestion),
         )
         .route(
+            "/editor/documents/{doc_id}/edits/pro-chat",
+            post(apply_chat_edit),
+        )
+        .route(
             "/editor/documents/{doc_id}/suggestions/{suggestion_id}/accept",
             post(accept_suggestion),
         )
@@ -191,11 +196,28 @@ async fn list_suggestions(
     Ok(Json(serde_json::to_value(suggestions).map_err(failed)?))
 }
 
-async fn create_chat_suggestion(
-    State(state): State<EditorState>,
-    Path(doc_id): Path<String>,
-    Json(request): Json<CreateChatSuggestion>,
-) -> Result<Json<serde_json::Value>, ApiError> {
+/// Who made a chat edit, as reported by the window.
+struct ChatAuthor {
+    connection_id: String,
+    label: String,
+    model: String,
+    actor: ActorRef,
+}
+
+fn edit_changed() -> ApiError {
+    (
+        StatusCode::CONFLICT,
+        "That part of the note changed after this reply was written. Ask again.".to_string(),
+    )
+}
+
+/// Validate a chat edit and check that the block it targets still reads as
+/// the model saw it. Shared by the suggestion and direct-edit routes.
+fn checked_chat_change(
+    state: &EditorState,
+    doc_id: &str,
+    request: CreateChatSuggestion,
+) -> Result<(SuggestedChange, ChatAuthor), ApiError> {
     const MAX_MARKDOWN_BYTES: usize = 256 * 1024;
     let markdown = match &request.change {
         ChatChange::InsertBlocks { markdown, .. } | ChatChange::ReplaceBlock { markdown, .. } => {
@@ -208,7 +230,7 @@ async fn create_chat_suggestion(
     }) {
         return Err((
             StatusCode::PAYLOAD_TOO_LARGE,
-            "The chat edit is empty or too large to suggest.".into(),
+            "The chat edit is empty or too large.".into(),
         ));
     }
     for value in
@@ -217,19 +239,13 @@ async fn create_chat_suggestion(
         if value.is_empty() || value.len() > 160 || value.chars().any(char::is_control) {
             return Err((
                 StatusCode::BAD_REQUEST,
-                "The chat suggestion contains invalid model metadata.".into(),
+                "The chat edit contains invalid model metadata.".into(),
             ));
         }
     }
 
     // The model saw one version of the block it edits. If the block has since
     // changed or gone, the edit no longer means what it did.
-    let changed = || {
-        (
-            StatusCode::CONFLICT,
-            "That part of the note changed after this reply was written. Ask again.".to_string(),
-        )
-    };
     if let ChatChange::ReplaceBlock {
         block_id, original, ..
     }
@@ -237,10 +253,10 @@ async fn create_chat_suggestion(
     {
         let current = state
             .workspace
-            .block_markdown(&doc_id, block_id)
-            .map_err(|_| changed())?;
+            .block_markdown(doc_id, block_id)
+            .map_err(|_| edit_changed())?;
         if current.trim_end() != original.trim_end() {
-            return Err(changed());
+            return Err(edit_changed());
         }
     }
     let change = match request.change {
@@ -258,44 +274,104 @@ async fn create_chat_suggestion(
         ChatChange::DeleteBlock { block_id, .. } => SuggestedChange::DeleteBlock { block_id },
     };
 
-    let current = state.workspace.read_document(&doc_id).map_err(failed)?;
     let (provider_id, provider_label) = match request.provider {
         ChatProvider::Openai => ("openai", "OpenAI"),
         ChatProvider::Anthropic => ("anthropic", "Anthropic"),
         ChatProvider::Chatgpt => ("chatgpt", "ChatGPT"),
     };
     let connection_id = format!("pro-chat:{provider_id}");
-    let model = request
-        .reported_model
-        .as_deref()
-        .unwrap_or(&request.requested_model);
+    let label = format!("{provider_label} chat (reported)");
+    let model = request.reported_model.unwrap_or(request.requested_model);
     let actor = ActorRef::reviewer(
         &connection_id,
-        &format!("{provider_label} chat (reported)"),
-        Some(model),
+        &label,
+        Some(&model),
         Some(&request.request_id),
     );
-    let context = MutationContext::mcp_connection(
-        format!("{provider_label} chat (reported)"),
-        &connection_id,
-    );
+    Ok((
+        change,
+        ChatAuthor {
+            connection_id,
+            label,
+            model,
+            actor,
+        },
+    ))
+}
+
+async fn create_chat_suggestion(
+    State(state): State<EditorState>,
+    Path(doc_id): Path<String>,
+    Json(request): Json<CreateChatSuggestion>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let request_id = request.request_id.clone();
+    let (change, author) = checked_chat_change(&state, &doc_id, request)?;
+    let current = state.workspace.read_document(&doc_id).map_err(failed)?;
+    let context = MutationContext::mcp_connection(author.label.clone(), &author.connection_id);
     let outcome = state
         .workspace
         .propose_suggestion(
             &doc_id,
-            &request.request_id,
+            &request_id,
             &current.content_revision,
             &change,
             None,
-            Some(model),
-            &connection_id,
-            &actor,
+            Some(&author.model),
+            &author.connection_id,
+            &author.actor,
             &context,
         )
         .map_err(|error| match error {
-            thought_mcp::WorkspaceError::Block(_) => changed(),
+            thought_mcp::WorkspaceError::Block(_) => edit_changed(),
             other => failed(other),
         })?;
+    Ok(Json(serde_json::to_value(outcome).map_err(failed)?))
+}
+
+/// Apply a chat edit directly, for a note the person has put in Edit mode.
+/// The window decides the mode; the daemon records who it says made the edit.
+async fn apply_chat_edit(
+    State(state): State<EditorState>,
+    Path(doc_id): Path<String>,
+    Json(request): Json<CreateChatSuggestion>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let (change, author) = checked_chat_change(&state, &doc_id, request)?;
+    let context = MutationContext::chat(author.label.clone(), &author.connection_id);
+    let workspace = &state.workspace;
+    let outcome = match change {
+        SuggestedChange::InsertBlocks { after, markdown } => {
+            let after = match after.as_deref() {
+                Some("start") => Position::Start,
+                None | Some("end") => Position::End,
+                Some(block_id) => Position::After(block_id.to_string()),
+            };
+            workspace.insert_blocks_with_context(
+                &doc_id,
+                &after,
+                &markdown,
+                None,
+                &author.actor,
+                &context,
+            )
+        }
+        SuggestedChange::ReplaceBlock { block_id, markdown } => workspace
+            .replace_block_with_context(
+                &doc_id,
+                &block_id,
+                &markdown,
+                None,
+                &author.actor,
+                &context,
+            ),
+        SuggestedChange::DeleteBlock { block_id } => {
+            workspace.delete_block_with_context(&doc_id, &block_id, None, &author.actor, &context)
+        }
+        SuggestedChange::ReplaceText { .. } => unreachable!("chat edits never replace text"),
+    }
+    .map_err(|error| match error {
+        thought_mcp::WorkspaceError::Block(_) => edit_changed(),
+        other => failed(other),
+    })?;
     Ok(Json(serde_json::to_value(outcome).map_err(failed)?))
 }
 

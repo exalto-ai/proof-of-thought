@@ -46,6 +46,10 @@ function markup(): string {
         <button id="pro-chat-attach" type="button"></button>
         <input id="pro-chat-attachment-input" type="file" multiple />
         <ul id="pro-chat-attachments" hidden></ul>
+        <select id="pro-chat-mode">
+          <option value="suggest">Suggest</option>
+          <option value="edit">Edit</option>
+        </select>
         <textarea id="pro-chat-input"></textarea>
         <button id="pro-chat-send" type="submit"></button>
       </form>
@@ -288,6 +292,55 @@ describe("built-in chat", () => {
     controller.setDocument(chatDocument());
     expect([...document.querySelectorAll(".pro-chat-change")].map((link) => link.textContent))
       .toEqual(["Edit: A firmer ending", "Edit: Coda"]);
+    controller.destroy();
+  });
+
+  it("applies edits directly in a note set to Edit mode, remembered per note", async () => {
+    const bridge = chatBridge({
+      send: vi.fn().mockResolvedValue({
+        text: "",
+        edits: [
+          { kind: "replace_block", block: 0, markdown: "Firmer", original: "Ending" },
+          { kind: "delete_block", block: 0, original: "Ending" },
+        ],
+        provider: "openai",
+        requested_model: "gpt-test",
+        reported_model: null,
+        wording_revision: "revision-1",
+        complete: true,
+      }),
+    });
+    const suggestEdit = vi.fn();
+    const applyEdit = vi.fn()
+      .mockResolvedValueOnce({ block_id: "1:9" })
+      .mockResolvedValueOnce({ block_id: null });
+    const focusBlock = vi.fn();
+    const controller = installChat({ bridge, suggestEdit, applyEdit, focusBlock });
+    const mode = document.querySelector<HTMLSelectElement>("#pro-chat-mode")!;
+    controller.setActive(true);
+    controller.setDocument({ ...chatDocument("note-a"), blockIds: () => ["1:0"] });
+    expect(mode.value).toBe("suggest");
+    mode.value = "edit";
+    mode.dispatchEvent(new Event("change"));
+
+    // Another note starts in Suggest; coming back restores Edit.
+    controller.setDocument(chatDocument("note-b"));
+    expect(mode.value).toBe("suggest");
+    controller.setDocument({ ...chatDocument("note-a"), blockIds: () => ["1:0"] });
+    expect(mode.value).toBe("edit");
+
+    await chooseOpenAi(bridge);
+    compose("Tighten it");
+    submitChat();
+    await vi.waitFor(() => expect(document.querySelectorAll(".pro-chat-change")).toHaveLength(2));
+    expect(suggestEdit).not.toHaveBeenCalled();
+    expect(applyEdit.mock.calls.map(([input]) => input.change.kind))
+      .toEqual(["replace_block", "delete_block"]);
+    expect(document.querySelector("#pro-chat-messages")?.textContent).toContain("Made 2 edits.");
+    const [edited, deleted] = document.querySelectorAll<HTMLElement>(".pro-chat-change");
+    expect(deleted.tagName).toBe("SPAN");
+    edited.click();
+    expect(focusBlock).toHaveBeenCalledWith("1:9");
     controller.destroy();
   });
 

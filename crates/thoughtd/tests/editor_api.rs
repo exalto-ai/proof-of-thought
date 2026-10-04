@@ -118,3 +118,62 @@ fn provider_chat_can_create_only_pending_reported_suggestions() {
     );
     assert_eq!(stale, 409);
 }
+
+#[test]
+fn edit_mode_applies_chat_edits_directly_with_reported_attribution() {
+    let daemon = Daemon::start();
+    let created = daemon.editor_post(
+        "/editor/documents",
+        serde_json::json!({ "title": "Draft", "markdown": "# Title\n\nOriginal text" }),
+    );
+    let doc_id = created["doc_id"].as_str().unwrap();
+    let block_id = daemon.connect().read_document(doc_id)["blocks"][1]["block_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let edited = daemon.editor_post(
+        &format!("/editor/documents/{doc_id}/edits/pro-chat"),
+        serde_json::json!({
+            "request_id": "chat-request-2.0",
+            "provider": "chatgpt",
+            "requested_model": "gpt-plan",
+            "change": {
+                "kind": "replace_block",
+                "block_id": block_id,
+                "markdown": "Better text",
+                "original": "Original text"
+            }
+        }),
+    );
+    assert!(edited["block_id"].is_string());
+    assert_eq!(
+        daemon.read_document(doc_id)["markdown"],
+        "# Title\n\nBetter text"
+    );
+    let suggestions = daemon.call("list_suggestions", serde_json::json!({ "doc_id": doc_id }));
+    assert_eq!(suggestions["suggestions"], serde_json::json!([]));
+
+    let lineage = daemon.call("document_lineage", serde_json::json!({ "doc_id": doc_id }));
+    let sources = lineage["summary"]["contributions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|contribution| contribution["source"].clone())
+        .collect::<Vec<_>>();
+    assert!(sources.iter().any(|source| source["ingress"] == "api"
+        && source["assurance"] == "reported"
+        && source["label"] == "ChatGPT chat (reported)"));
+
+    // The same freshness check as suggestions: the edit is refused, not merged.
+    let stale = daemon.editor_post_status(
+        &format!("/editor/documents/{doc_id}/edits/pro-chat"),
+        serde_json::json!({
+            "request_id": "chat-request-2.1",
+            "provider": "chatgpt",
+            "requested_model": "gpt-plan",
+            "change": { "kind": "delete_block", "block_id": block_id, "original": "Original text" }
+        }),
+    );
+    assert_eq!(stale, 409);
+}

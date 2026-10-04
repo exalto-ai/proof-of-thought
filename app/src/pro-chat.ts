@@ -39,6 +39,8 @@ const MAX_SUGGESTION_REQUEST_ID_BYTES = 128;
 const MAX_CHANGES = 20;
 const MAX_PREVIEW_CHARS = 60;
 const STORAGE_PREFIX = "thought.pro-chat.v1.";
+/** Per note, whether chat edits apply directly. Absent means Suggest. */
+const MODE_PREFIX = "thought.pro-chat.mode.v1.";
 const STORAGE_VERSION = 1;
 const TEXT_FILE_NAME = /\.(?:csv|html?|json|log|markdown|md|toml|txt|xml|ya?ml)$/i;
 const TEXT_MEDIA_TYPES = new Set([
@@ -64,8 +66,12 @@ type Options = {
   bridge?: ProChatBridge | null;
   /** Turn one chat edit into a suggestion in the note. */
   suggestEdit?: (input: ChatSuggestionInput) => Promise<{ suggestion: { suggestion_id: string } }>;
+  /** Apply one chat edit directly, in a note set to Edit mode. */
+  applyEdit?: (input: ChatSuggestionInput) => Promise<{ block_id: string | null }>;
   /** Show a suggestion in the note and open its card. */
   focusSuggestion?: (suggestionId: string) => void;
+  /** Show a block the chat edited. */
+  focusBlock?: (blockId: string) => void;
   createRequestId?: () => string;
   onNotice?: (message: string, kind?: "info" | "error") => void;
   storage?: ChatStorage | null;
@@ -75,11 +81,18 @@ type Options = {
   onSelectionChange?: (provider: ProProvider | null) => void;
 };
 
-/** A suggestion a reply made in the note, as the chat links to it. */
+export type ChatMode = "suggest" | "edit";
+
+/**
+ * A change a reply made in the note, as the chat links to it: a suggestion,
+ * or in Edit mode the block it wrote (none for a deletion).
+ */
 type ChangeSummary = {
-  suggestion_id: string;
   kind: ChatEdit["kind"];
   preview: string;
+  suggestion_id?: string;
+  applied?: true;
+  block_id?: string | null;
 };
 
 type LocalMessage = ChatMessage & {
@@ -201,15 +214,27 @@ function response(value: unknown, text: string): SendChatResponse | undefined {
   };
 }
 
+function storedIdentifier(value: unknown): value is string {
+  return storedString(value, MAX_PERSISTED_IDENTIFIER_BYTES) &&
+    !/[\u0000-\u001f\u007f-\u009f]/.test(value);
+}
+
 function changeSummary(value: unknown): ChangeSummary | null {
   if (
-    !isRecord(value) || !storedString(value.suggestion_id, MAX_PERSISTED_IDENTIFIER_BYTES) ||
-    /[\u0000-\u001f\u007f-\u009f]/.test(value.suggestion_id) ||
+    !isRecord(value) ||
     (value.kind !== "replace_block" && value.kind !== "insert_blocks" &&
       value.kind !== "delete_block") ||
     typeof value.preview !== "string" || value.preview.length > MAX_PREVIEW_CHARS + 1
   ) return null;
-  return { suggestion_id: value.suggestion_id, kind: value.kind, preview: value.preview };
+  const summary = { kind: value.kind as ChatEdit["kind"], preview: value.preview };
+  if (value.applied === true && value.suggestion_id === undefined) {
+    if (value.block_id !== null && value.block_id !== undefined && !storedIdentifier(value.block_id)) {
+      return null;
+    }
+    return { ...summary, applied: true, block_id: value.block_id ?? null };
+  }
+  if (value.applied !== undefined || value.block_id !== undefined) return null;
+  return storedIdentifier(value.suggestion_id) ? { ...summary, suggestion_id: value.suggestion_id } : null;
 }
 
 /** The first line of some Markdown as plain words, shortened for a link. */
@@ -456,6 +481,7 @@ export function installProChat(
   const panel = required<HTMLElement>(root, "#pro-chat", "chat");
   const modelSelect = required<HTMLSelectElement>(panel, "#pro-chat-model", "chat");
   const thinkingSelect = required<HTMLSelectElement>(panel, "#pro-chat-thinking", "chat");
+  const modeSelect = panel.querySelector<HTMLSelectElement>("#pro-chat-mode");
   const retry = required<HTMLButtonElement>(panel, "#pro-chat-retry", "chat");
   const storageNotice = required<HTMLElement>(panel, "#pro-chat-storage-notice", "chat");
   const documentLabel = required<HTMLElement>(panel, "#pro-chat-document", "chat");
@@ -580,6 +606,32 @@ export function installProChat(
     }
   }
 
+  function modeKey(documentId: string): string {
+    return `${MODE_PREFIX}${encodeURIComponent(documentId)}`;
+  }
+
+  /** The note's chat mode. Every note starts in Suggest. */
+  function readMode(documentId: string): ChatMode {
+    try {
+      return storage?.getItem(modeKey(documentId)) === "edit" ? "edit" : "suggest";
+    } catch {
+      return "suggest";
+    }
+  }
+
+  function saveMode(documentId: string, mode: ChatMode): void {
+    try {
+      if (mode === "edit") storage?.setItem(modeKey(documentId), "edit");
+      else storage?.removeItem(modeKey(documentId));
+    } catch {
+      showStorageNotice();
+    }
+  }
+
+  function currentMode(): ChatMode {
+    return modeSelect?.value === "edit" ? "edit" : "suggest";
+  }
+
   function clearSavedConversation(): void {
     if (storage === null || currentDocument === null) return;
     try {
@@ -623,15 +675,26 @@ export function installProChat(
       const changes = root.createElement("div");
       changes.className = "pro-chat-changes";
       for (const change of message.changes) {
+        const label = change.preview
+          ? `${CHANGE_VERBS[change.kind]}: ${change.preview}`
+          : CHANGE_VERBS[change.kind];
+        const target = change.applied ? change.block_id : change.suggestion_id;
+        // A deleted block has nowhere to show.
+        if (!target) {
+          const done = root.createElement("span");
+          done.className = "pro-chat-change";
+          done.textContent = label;
+          changes.append(done);
+          continue;
+        }
         const link = root.createElement("button");
         link.type = "button";
         link.className = "pro-chat-change";
         link.dataset.kind = change.kind;
-        link.textContent = change.preview
-          ? `${CHANGE_VERBS[change.kind]}: ${change.preview}`
-          : CHANGE_VERBS[change.kind];
-        link.title = "Show this suggestion in the note";
-        link.addEventListener("click", () => options.focusSuggestion?.(change.suggestion_id));
+        link.textContent = label;
+        link.title = change.applied ? "Show this in the note" : "Show this suggestion in the note";
+        link.addEventListener("click", () =>
+          change.applied ? options.focusBlock?.(target) : options.focusSuggestion?.(target));
         changes.append(link);
       }
       item.append(changes);
@@ -690,6 +753,7 @@ export function installProChat(
       stagedAttachments.length >= MAX_ATTACHMENTS;
     attachmentInput.disabled = attach.disabled;
     modelSelect.disabled = busy;
+    if (modeSelect) modeSelect.disabled = currentDocument === null || busy;
     thinkingSelect.disabled = selectedProvider === null || !hasModel || loadingModels || busy;
     retry.disabled = loadingModels || selectedProvider === null || bridge === null || busy;
     input.disabled = currentDocument === null || busy || bridge === null;
@@ -938,6 +1002,7 @@ export function installProChat(
     const selectedThinking = thinking(thinkingSelect.value);
     const snapshot = document.snapshot();
     const blockIds = document.blockIds();
+    const mode = currentMode();
     const generation = ++requestGeneration;
     const previous = messages.map(({ role, text }) => ({ role, text }));
     const requestAttachments: ChatAttachment[] = stagedAttachments.map((attachment) => ({
@@ -986,15 +1051,19 @@ export function installProChat(
       if (!validSuggestionRequestId(suggestionRequestId)) {
         throw new Error("Proof of Thought could not create a safe suggestion retry identifier.");
       }
-      const changes = await suggestEdits(document, chatResponse, blockIds, suggestionRequestId);
+      const changes = await applyEdits(document, chatResponse, blockIds, suggestionRequestId, mode);
       if (destroyed || generation !== requestGeneration || currentDocument?.id !== document.id) {
         return;
       }
       const text = chatResponse.text.trim()
         ? chatResponse.text
-        : changes.length === 0
-          ? "Could not suggest the edits."
-          : changes.length === 1 ? "Suggested an edit." : `Suggested ${changes.length} edits.`;
+        : mode === "edit"
+          ? changes.length === 0
+            ? "Could not edit the note."
+            : changes.length === 1 ? "Edited the note." : `Made ${changes.length} edits.`
+          : changes.length === 0
+            ? "Could not suggest the edits."
+            : changes.length === 1 ? "Suggested an edit." : `Suggested ${changes.length} edits.`;
       messages.push(
         {
           role: "user",
@@ -1028,16 +1097,20 @@ export function installProChat(
   }
 
   /**
-   * Turn a reply's edits into suggestions in the note, in order. Each edit
-   * that fails is reported once; the rest still land.
+   * Turn a reply's edits into suggestions in the note, or in Edit mode apply
+   * them, in order. Each edit that fails is reported once; the rest still land.
    */
-  async function suggestEdits(
+  async function applyEdits(
     document: ProChatDocument,
     chatResponse: SendChatResponse,
     blockIds: Array<string | null>,
     requestId: string,
+    mode: ChatMode,
   ): Promise<ChangeSummary[]> {
-    if (chatResponse.edits.length === 0 || options.suggestEdit === undefined) return [];
+    const apply = mode === "edit" ? options.applyEdit : undefined;
+    if (chatResponse.edits.length === 0 || (apply === undefined && options.suggestEdit === undefined)) {
+      return [];
+    }
     if (!(await document.waitUntilSaved())) {
       throw new Error("Wait for this note to finish saving, then try again.");
     }
@@ -1046,29 +1119,42 @@ export function installProChat(
     for (const [index, edit] of chatResponse.edits.slice(0, MAX_CHANGES).entries()) {
       const change = chatChange(edit, blockIds);
       if (change === null) continue;
+      const input: ChatSuggestionInput = {
+        documentId: document.id,
+        requestId: `${requestId}.${index}`,
+        provider: chatResponse.provider,
+        requestedModel: chatResponse.requested_model,
+        reportedModel: chatResponse.reported_model,
+        change,
+      };
+      const summary = {
+        kind: edit.kind,
+        preview: preview(edit.kind === "delete_block" ? edit.original : edit.markdown),
+      };
       try {
-        const outcome = await options.suggestEdit({
-          documentId: document.id,
-          requestId: `${requestId}.${index}`,
-          provider: chatResponse.provider,
-          requestedModel: chatResponse.requested_model,
-          reportedModel: chatResponse.reported_model,
-          change,
-        });
-        changes.push({
-          suggestion_id: outcome.suggestion.suggestion_id,
-          kind: edit.kind,
-          preview: preview(edit.kind === "delete_block" ? edit.original : edit.markdown),
-        });
+        if (apply) {
+          const outcome = await apply(input);
+          changes.push({ ...summary, applied: true, block_id: outcome.block_id });
+        } else {
+          const outcome = await options.suggestEdit!(input);
+          changes.push({ ...summary, suggestion_id: outcome.suggestion.suggestion_id });
+        }
       } catch (cause) {
-        failures.push(oneLine(cause, "The suggestion could not be created."));
+        failures.push(oneLine(cause, "The note could not be changed."));
       }
     }
     if (failures.length > 0) {
       const count = failures.length === 1 ? "an edit" : `${failures.length} edits`;
-      setError(`Could not suggest ${count}: ${failures[0]}`);
+      const verb = apply ? "make" : "suggest";
+      setError(`Could not ${verb} ${count}: ${failures[0]}`);
     }
     return changes;
+  }
+
+  if (modeSelect) {
+    listen(modeSelect, "change", () => {
+      if (currentDocument) saveMode(currentDocument.id, currentMode());
+    });
   }
 
   listen(modelSelect, "change", () => {
@@ -1170,6 +1256,7 @@ export function installProChat(
       clearTransientState();
       messages = [];
       thinkingSelect.value = "provider_default";
+      if (modeSelect) modeSelect.value = document ? readMode(document.id) : "suggest";
       const before = selectedProvider;
       if (document) {
         const saved = readConversation(document.id);
