@@ -92,6 +92,8 @@ export function installDocumentSidebar(
   const filter = required<HTMLInputElement>(root, "#doc-filter", "documents sidebar");
   const list = required<HTMLElement>(root, "#doc-list", "documents sidebar");
   const empty = required<HTMLElement>(root, "#doc-list-empty", "documents sidebar");
+  const emptyTitle = required<HTMLElement>(root, "#doc-list-empty-title", "documents sidebar");
+  const emptyNew = required<HTMLButtonElement>(root, "#doc-list-empty-new", "documents sidebar");
   const create = required<HTMLButtonElement>(root, "#doc-new", "documents sidebar");
   const now = options.now ?? Date.now;
   const disposers: Array<() => void> = [];
@@ -157,11 +159,18 @@ export function installDocumentSidebar(
     return group;
   }
 
+  /** A centred title, and a New Note action when there are no notes at all. */
+  function showEmpty(isEmpty: boolean, title: string, offerNew: boolean) {
+    empty.hidden = !isEmpty;
+    list.hidden = isEmpty;
+    emptyTitle.textContent = title;
+    emptyNew.hidden = !offerNew;
+  }
+
   function render() {
     if (results !== null) {
       list.replaceChildren(...(results.length ? [section("Results", results.map(row))] : []));
-      empty.textContent = "No matching documents";
-      empty.hidden = results.length > 0;
+      showEmpty(results.length === 0, "No Results", false);
       return;
     }
     list.replaceChildren(
@@ -169,8 +178,7 @@ export function installDocumentSidebar(
         section(group.label, group.documents.map(row))
       ),
     );
-    empty.textContent = "No documents yet";
-    empty.hidden = documents.length > 0;
+    showEmpty(documents.length === 0, "No Notes", true);
   }
 
   /** Coalesce bursts (typing in the open document) into one redraw. */
@@ -255,6 +263,7 @@ export function installDocumentSidebar(
     }, FILTER_DELAY_MS);
   });
   listen(create, "click", () => void options.create());
+  listen(emptyNew, "click", () => void options.create());
   // New documents from other windows appear when this one comes forward.
   listen(window, "focus", () => {
     if (panel.isOpen()) void refresh();

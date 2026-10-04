@@ -27,7 +27,10 @@
           <button class="doc-new" id="doc-new" type="button" aria-label="New document" title="New document"></button>
         </div>
         <nav class="doc-list" id="doc-list" aria-label="Documents"></nav>
-        <p class="doc-list-empty" id="doc-list-empty" hidden></p>
+        <div class="empty-state" id="doc-list-empty" hidden>
+          <p class="empty-state-title" id="doc-list-empty-title"></p>
+          <button class="empty-state-action" id="doc-list-empty-new" type="button">New Note</button>
+        </div>
       </aside>
       <div class="side-panel-resizer" id="doc-sidebar-resizer" role="separator" aria-orientation="vertical" aria-controls="doc-sidebar" aria-label="Resize documents sidebar" tabindex="0" hidden></div>
 
@@ -45,10 +48,11 @@
       <aside class="side-panel ai-sidebar" id="ai-support-sidebar" data-side-panel aria-label="AI" tabindex="-1" hidden>
         <div class="titlebar" data-tauri-drag-region></div>
 
-        <section class="ai-chat-setup" id="ai-chat-setup" hidden>
-          <p>Add an OpenAI or Anthropic key in Settings to chat about this document.</p>
-          <p class="ai-sidebar-note">Connections to apps such as ChatGPT or Claude Code are set up there too. Their proposals appear in the document for you to accept or reject.</p>
-          <button class="ghost" id="ai-chat-setup-open" type="button">Open Settings</button>
+        <section class="empty-state ai-chat-setup" id="ai-chat-setup" hidden>
+          <span class="empty-state-icon" id="ai-chat-setup-icon" aria-hidden="true"></span>
+          <p class="empty-state-title">Chat about this note</p>
+          <p class="empty-state-detail">Add an OpenAI or Anthropic key to start.</p>
+          <button class="empty-state-action" id="ai-chat-setup-open" type="button">Open Settings</button>
         </section>
 
         <section class="pro-chat" id="pro-chat" aria-labelledby="pro-chat-title" hidden>

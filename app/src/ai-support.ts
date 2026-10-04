@@ -3,6 +3,7 @@ import type { ProProvider, ProProviderBridge } from "./pro-provider-bridge";
 import type { ProChatBridge } from "./pro-chat-bridge";
 import { installProChat, type ProChatDocument } from "./pro-chat";
 import { required } from "./dom";
+import { ICONS, icon } from "./icons";
 import { installSidePanel } from "./side-panel";
 import { safeLocalStorage } from "./storage";
 
@@ -47,6 +48,9 @@ export function installAiSupport(
   const chatPanel = required<HTMLElement>(root, "#pro-chat", "AI sidebar");
   const providerSelect = required<HTMLSelectElement>(root, "#pro-chat-provider", "AI sidebar");
   const openSettings = required<HTMLButtonElement>(root, "#ai-chat-setup-open", "AI sidebar");
+  required<HTMLElement>(root, "#ai-chat-setup-icon", "AI sidebar").replaceChildren(
+    icon(ICONS.messageSquare),
+  );
   const disposers: Array<() => void> = [];
   const chat = installProChat(root, {
     bridge: options.chatBridge,

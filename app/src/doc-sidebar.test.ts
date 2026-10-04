@@ -95,6 +95,36 @@ describe("document sidebar", () => {
     controller.destroy();
   });
 
+  it("shows a centred empty state with New Note, or No Results for a search", async () => {
+    vi.useFakeTimers();
+    const create = vi.fn();
+    const controller = installDocumentSidebar(document, {
+      storage: memoryStorage(),
+      list: vi.fn().mockResolvedValue([]),
+      search: vi.fn().mockResolvedValue([]),
+      open: vi.fn(),
+      create,
+      now: () => NOW,
+    });
+    await controller.refresh();
+    const empty = document.querySelector<HTMLElement>("#doc-list-empty")!;
+    const action = document.querySelector<HTMLButtonElement>("#doc-list-empty-new")!;
+
+    expect(empty.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>("#doc-list")!.hidden).toBe(true);
+    expect(empty.textContent).toContain("No Notes");
+    action.click();
+    expect(create).toHaveBeenCalledOnce();
+
+    const filter = document.querySelector<HTMLInputElement>("#doc-filter")!;
+    filter.value = "zzz";
+    filter.dispatchEvent(new Event("input"));
+    await vi.advanceTimersByTimeAsync(150);
+    expect(document.querySelector("#doc-list-empty-title")!.textContent).toBe("No Results");
+    expect(action.hidden).toBe(true);
+    controller.destroy();
+  });
+
   it("asks for a menu on right-click and rings that row while it is open", async () => {
     let close!: () => void;
     const showMenu = vi.fn(() => new Promise<void>((resolve) => (close = resolve)));
