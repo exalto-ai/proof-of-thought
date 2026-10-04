@@ -660,6 +660,7 @@ fn prepare(request: &SendChatRequest) -> Result<PreparedChat, String> {
             "instructions": SYSTEM_PROMPT,
             "input": messages,
             "store": false,
+            "stream": true,
             "max_output_tokens": MAX_OUTPUT_TOKENS,
         }),
         // Plan usage requires streaming, no stored response, and no output cap.
@@ -675,6 +676,7 @@ fn prepare(request: &SendChatRequest) -> Result<PreparedChat, String> {
             "system": SYSTEM_PROMPT,
             "messages": messages,
             "max_tokens": MAX_OUTPUT_TOKENS,
+            "stream": true,
         }),
     };
     body["tools"] = tools_for(request.provider);
@@ -844,49 +846,76 @@ fn resolve_edits(calls: &[(String, Value)], blocks: &[String]) -> Vec<ChatEdit> 
         .collect()
 }
 
-/// The final response from a streamed Responses API call: the payload of
-/// `response.completed` (or `response.incomplete`). Plan-usage errors arrive
-/// as `response.failed` events rather than HTTP statuses.
-fn streamed_response(mut response: ureq::http::Response<ureq::Body>) -> Result<Value, String> {
-    let status = response.status().as_u16();
-    if !(200..300).contains(&status) {
-        let mut body = bounded_body(&mut response, MAX_ERROR_BYTES).unwrap_or_default();
-        body.zeroize();
-        return Err(provider_failure(Provider::Chatgpt, status));
-    }
-    let limit = u64::try_from(MAX_RESPONSE_BYTES * 8)
-        .map_err(|_| "The provider response limit is invalid.".to_string())?;
-    let mut body = response
-        .body_mut()
-        .with_config()
-        .limit(limit)
-        .read_to_vec()
-        .map_err(|_| "The ChatGPT response could not be read.".to_string())?;
-    let result = final_streamed_response(&body);
-    body.zeroize();
-    result
+/// What the window shows while a reply arrives: visible text as it streams,
+/// and the name of each edit tool as the model starts calling it. Reasoning
+/// never crosses.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ChatProgress {
+    Text { delta: String },
+    Edit { tool: String },
 }
 
-/// Parse server-sent events and return the final response object. With plan
-/// usage, `response.completed` carries only metadata: the visible text arrives
-/// in `response.output_text.delta` events and is folded back in as the
-/// response's message output, so the rest of chat reads it like any reply.
-fn final_streamed_response(body: &[u8]) -> Result<Value, String> {
-    let text = std::str::from_utf8(body)
-        .map_err(|_| "ChatGPT returned an unreadable response.".to_string())?;
+/// Feed each server-sent event's JSON to `handle` until it yields a result.
+/// Lines are bounded by the reader's own byte limit.
+fn read_events<T>(
+    reader: impl std::io::BufRead,
+    mut handle: impl FnMut(&Value) -> Result<Option<T>, String>,
+) -> Result<Option<T>, String> {
+    for line in reader.lines() {
+        let mut line = line.map_err(|_| "The provider response could not be read.".to_string())?;
+        let event = line
+            .strip_prefix("data:")
+            .and_then(|data| serde_json::from_str::<Value>(data.trim()).ok());
+        line.zeroize();
+        if let Some(event) = event
+            && let Some(done) = handle(&event)?
+        {
+            return Ok(Some(done));
+        }
+    }
+    Ok(None)
+}
+
+fn edit_tool(name: Option<&str>) -> Option<ChatProgress> {
+    name.filter(|name| edit_tools().iter().any(|(tool, ..)| tool == name))
+        .map(|tool| ChatProgress::Edit {
+            tool: tool.to_string(),
+        })
+}
+
+/// The final response of a streamed Responses API call: the payload of
+/// `response.completed` (or `response.incomplete`). With plan usage that
+/// payload carries only metadata, so text and tool calls collected from the
+/// stream are folded back in as its output. Errors, including plan-usage
+/// limits, arrive as `response.failed` events rather than HTTP statuses.
+fn responses_stream(
+    provider: Provider,
+    reader: impl std::io::BufRead,
+    mut progress: impl FnMut(ChatProgress),
+) -> Result<Value, String> {
     let mut streamed = String::new();
     let mut calls = Vec::new();
-    for line in text.lines() {
-        let Some(data) = line.strip_prefix("data:").map(str::trim) else {
-            continue;
-        };
-        let Ok(event) = serde_json::from_str::<Value>(data) else {
-            continue;
-        };
+    read_events(reader, |event| {
         match event.get("type").and_then(Value::as_str) {
             Some("response.output_text.delta") => {
-                if let Some(delta) = event.get("delta").and_then(Value::as_str) {
+                if let Some(delta) = event.get("delta").and_then(Value::as_str)
+                    && streamed.len() + delta.len() <= MAX_VISIBLE_RESPONSE_BYTES
+                {
                     streamed.push_str(delta);
+                    progress(ChatProgress::Text {
+                        delta: delta.to_string(),
+                    });
+                }
+            }
+            Some("response.output_item.added") => {
+                let item = event.get("item");
+                if item.and_then(|item| item.get("type")).and_then(Value::as_str)
+                    == Some("function_call")
+                    && let Some(edit) =
+                        edit_tool(item.and_then(|item| item.get("name")).and_then(Value::as_str))
+                {
+                    progress(edit);
                 }
             }
             Some("response.output_item.done") => {
@@ -900,20 +929,20 @@ fn final_streamed_response(body: &[u8]) -> Result<Value, String> {
                 let mut response = event
                     .get("response")
                     .cloned()
-                    .ok_or_else(|| "ChatGPT returned an incomplete response.".to_string())?;
+                    .ok_or_else(|| format!("{} returned an incomplete response.", provider.name()))?;
                 // Keep a completion's own output; fill in from the stream only
                 // when it carries none.
-                if parse_reply(Provider::Chatgpt, &response).is_err() {
-                    let mut output = calls;
+                if parse_reply(provider, &response).is_err() {
+                    let mut output = std::mem::take(&mut calls);
                     if !streamed.is_empty() {
-                        output.push(serde_json::json!({
+                        output.push(json!({
                             "type": "message",
                             "content": [{ "type": "output_text", "text": streamed }],
                         }));
                     }
                     response["output"] = Value::Array(output);
                 }
-                return Ok(response);
+                return Ok(Some(response));
             }
             Some("response.failed" | "error") => {
                 let code = event
@@ -928,17 +957,152 @@ fn final_streamed_response(body: &[u8]) -> Result<Value, String> {
                     Some("subscription_sharing_usage_unavailable") => {
                         "ChatGPT plan usage is not available for this account right now.".into()
                     }
-                    _ => "ChatGPT could not answer this request.".into(),
+                    _ => format!("{} could not answer this request.", provider.name()),
                 });
             }
             _ => {}
         }
+        Ok(None)
+    })?
+    .ok_or_else(|| format!("{} ended the response before it completed.", provider.name()))
+}
+
+/// The final message of a streamed Anthropic call, rebuilt from its events
+/// into the shape a non-streamed call returns.
+fn anthropic_stream(
+    reader: impl std::io::BufRead,
+    mut progress: impl FnMut(ChatProgress),
+) -> Result<Value, String> {
+    let mut model = Value::Null;
+    let mut stop_reason = Value::Null;
+    let mut blocks: Vec<Value> = Vec::new();
+    // Tool input arrives as JSON text in pieces, one buffer per block.
+    let mut inputs: Vec<String> = Vec::new();
+    let mut text_bytes = 0;
+    read_events(reader, |event| {
+        let index = event
+            .get("index")
+            .and_then(Value::as_u64)
+            .map(|index| index as usize);
+        match event.get("type").and_then(Value::as_str) {
+            Some("message_start") => {
+                model = event
+                    .pointer("/message/model")
+                    .cloned()
+                    .unwrap_or(Value::Null);
+            }
+            Some("content_block_start") => {
+                let block = event.get("content_block").cloned().unwrap_or(Value::Null);
+                if block.get("type").and_then(Value::as_str) == Some("tool_use")
+                    && let Some(edit) = edit_tool(block.get("name").and_then(Value::as_str))
+                {
+                    progress(edit);
+                }
+                blocks.push(block);
+                inputs.push(String::new());
+            }
+            Some("content_block_delta") => {
+                let Some(index) = index.filter(|index| *index < blocks.len()) else {
+                    return Ok(None);
+                };
+                let delta = event.get("delta");
+                match delta
+                    .and_then(|delta| delta.get("type"))
+                    .and_then(Value::as_str)
+                {
+                    Some("text_delta") => {
+                        if let Some(text) = delta
+                            .and_then(|delta| delta.get("text"))
+                            .and_then(Value::as_str)
+                            && text_bytes + text.len() <= MAX_VISIBLE_RESPONSE_BYTES
+                        {
+                            text_bytes += text.len();
+                            let joined = format!(
+                                "{}{text}",
+                                blocks[index]
+                                    .get("text")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or_default()
+                            );
+                            blocks[index]["text"] = Value::String(joined);
+                            progress(ChatProgress::Text {
+                                delta: text.to_string(),
+                            });
+                        }
+                    }
+                    Some("input_json_delta") => {
+                        if let Some(json) = delta
+                            .and_then(|delta| delta.get("partial_json"))
+                            .and_then(Value::as_str)
+                            && inputs[index].len() + json.len() <= MAX_VISIBLE_RESPONSE_BYTES
+                        {
+                            inputs[index].push_str(json);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Some("content_block_stop") => {
+                if let Some(index) = index.filter(|index| *index < blocks.len())
+                    && blocks[index].get("type").and_then(Value::as_str) == Some("tool_use")
+                    && !inputs[index].is_empty()
+                {
+                    blocks[index]["input"] =
+                        serde_json::from_str(&inputs[index]).unwrap_or(Value::Null);
+                }
+            }
+            Some("message_delta") => {
+                if let Some(reason) = event.pointer("/delta/stop_reason") {
+                    stop_reason = reason.clone();
+                }
+            }
+            Some("message_stop") => {
+                return Ok(Some(json!({
+                    "model": model,
+                    "stop_reason": stop_reason,
+                    "content": std::mem::take(&mut blocks),
+                })));
+            }
+            Some("error") => {
+                return Err(match event.pointer("/error/type").and_then(Value::as_str) {
+                    Some("overloaded_error") => "Anthropic is temporarily unavailable.",
+                    _ => "Anthropic could not answer this request.",
+                }
+                .into());
+            }
+            _ => {}
+        }
+        Ok(None)
+    })?
+    .ok_or_else(|| "Anthropic ended the response before it completed.".to_string())
+}
+
+/// Read a streamed provider response, reporting progress as it arrives.
+fn streamed_response(
+    provider: Provider,
+    mut response: ureq::http::Response<ureq::Body>,
+    progress: impl FnMut(ChatProgress),
+) -> Result<Value, String> {
+    let status = response.status().as_u16();
+    if !(200..300).contains(&status) {
+        let mut body = bounded_body(&mut response, MAX_ERROR_BYTES).unwrap_or_default();
+        body.zeroize();
+        return Err(provider_failure(provider, status));
     }
-    Err("ChatGPT ended the response before it completed.".into())
+    let limit = u64::try_from(MAX_RESPONSE_BYTES * 8)
+        .map_err(|_| "The provider response limit is invalid.".to_string())?;
+    let reader = std::io::BufReader::new(response.body_mut().with_config().limit(limit).reader());
+    match provider {
+        Provider::Openai | Provider::Chatgpt => responses_stream(provider, reader, progress),
+        Provider::Anthropic => anthropic_stream(reader, progress),
+    }
 }
 
 #[tauri::command]
-pub async fn send_provider_chat(request: SendChatRequest) -> Result<SendChatResponse, String> {
+pub async fn send_provider_chat(
+    request: SendChatRequest,
+    on_progress: tauri::ipc::Channel<ChatProgress>,
+) -> Result<SendChatResponse, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let prepared = prepare(&request)?;
         let key = pro_provider::credential(request.provider)?;
@@ -949,14 +1113,7 @@ pub async fn send_provider_chat(request: SendChatRequest) -> Result<SendChatResp
         let (header, header_value) = auth_header(request.provider, &key)?;
         let mut provider_request = agent()
             .post(endpoint)
-            .header(
-                "accept",
-                if request.provider == Provider::Chatgpt {
-                    "text/event-stream"
-                } else {
-                    "application/json"
-                },
-            )
+            .header("accept", "text/event-stream")
             .header(header, header_value.as_str());
         if request.provider == Provider::Anthropic {
             provider_request = provider_request.header("anthropic-version", "2023-06-01");
@@ -964,11 +1121,11 @@ pub async fn send_provider_chat(request: SendChatRequest) -> Result<SendChatResp
         let response = provider_request
             .send_json(&prepared.body)
             .map_err(|_| format!("Could not reach {}.", request.provider.name()))?;
-        let value = if request.provider == Provider::Chatgpt {
-            streamed_response(response)?
-        } else {
-            checked_json(response, request.provider, MAX_RESPONSE_BYTES)?
-        };
+        // A window that has gone away just stops listening; the reply still
+        // completes and is returned.
+        let value = streamed_response(request.provider, response, |progress| {
+            let _ = on_progress.send(progress);
+        })?;
         let reply = parse_reply(request.provider, &value)?;
         let edits = resolve_edits(&reply.calls, &prepared.blocks);
         if reply.text.trim().is_empty() && edits.is_empty() {
@@ -1033,7 +1190,7 @@ mod tests {
             "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",",
             "\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hi there\"}]}]}}\n\n",
         );
-        let value = final_streamed_response(body.as_bytes()).unwrap();
+        let value = responses_stream(Provider::Chatgpt, body.as_bytes(), |_| {}).unwrap();
         assert_eq!(
             visible_text(Provider::Chatgpt, &value).unwrap(),
             ("Hi there".into(), true)
@@ -1047,7 +1204,7 @@ mod tests {
             "data: {\"type\":\"response.output_text.delta\",\"delta\":\"there\"}\n\n",
             "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"model\":\"gpt-plan\"}}\n\n",
         );
-        let value = final_streamed_response(body.as_bytes()).unwrap();
+        let value = responses_stream(Provider::Chatgpt, body.as_bytes(), |_| {}).unwrap();
         assert_eq!(
             visible_text(Provider::Chatgpt, &value).unwrap(),
             ("Hello there".into(), true)
@@ -1062,7 +1219,7 @@ mod tests {
             "\"name\":\"delete_block\",\"arguments\":\"{\\\"block\\\":\\\"b1\\\"}\"}}\n\n",
             "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n",
         );
-        let value = final_streamed_response(body.as_bytes()).unwrap();
+        let value = responses_stream(Provider::Chatgpt, body.as_bytes(), |_| {}).unwrap();
         let reply = parse_reply(Provider::Chatgpt, &value).unwrap();
         assert_eq!(reply.text, "");
         assert_eq!(
@@ -1169,14 +1326,94 @@ mod tests {
     }
 
     #[test]
+    fn anthropic_streams_rebuild_the_message_and_report_progress() {
+        let events = [
+            json!({ "type": "message_start", "message": { "model": "claude-test" } }),
+            json!({ "type": "content_block_start", "index": 0, "content_block": { "type": "thinking", "thinking": "" } }),
+            json!({ "type": "content_block_delta", "index": 0, "delta": { "type": "thinking_delta", "thinking": "hidden" } }),
+            json!({ "type": "content_block_start", "index": 1, "content_block": { "type": "text", "text": "" } }),
+            json!({ "type": "content_block_delta", "index": 1, "delta": { "type": "text_delta", "text": "Tight" } }),
+            json!({ "type": "content_block_delta", "index": 1, "delta": { "type": "text_delta", "text": "ening." } }),
+            json!({ "type": "content_block_start", "index": 2, "content_block": { "type": "tool_use", "id": "t", "name": "delete_block", "input": {} } }),
+            json!({ "type": "content_block_delta", "index": 2, "delta": { "type": "input_json_delta", "partial_json": "{\"block\":" } }),
+            json!({ "type": "content_block_delta", "index": 2, "delta": { "type": "input_json_delta", "partial_json": "\"b1\"}" } }),
+            json!({ "type": "content_block_stop", "index": 2 }),
+            json!({ "type": "message_delta", "delta": { "stop_reason": "tool_use" } }),
+            json!({ "type": "message_stop" }),
+        ];
+        let body = events
+            .iter()
+            .map(|event| format!("event: x\ndata: {event}\n\n"))
+            .collect::<String>();
+        let mut progress = Vec::new();
+        let value = anthropic_stream(body.as_bytes(), |event| progress.push(event)).unwrap();
+        assert_eq!(value["model"], "claude-test");
+        let reply = parse_reply(Provider::Anthropic, &value).unwrap();
+        assert_eq!(reply.text, "Tightening.");
+        assert_eq!(
+            reply.calls,
+            vec![("delete_block".into(), json!({ "block": "b1" }))]
+        );
+        assert!(reply.complete);
+        assert_eq!(
+            progress,
+            vec![
+                ChatProgress::Text {
+                    delta: "Tight".into()
+                },
+                ChatProgress::Text {
+                    delta: "ening.".into()
+                },
+                ChatProgress::Edit {
+                    tool: "delete_block".into()
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn responses_streams_report_text_and_edits_as_they_start() {
+        let body = concat!(
+            "data: {\"type\":\"response.reasoning_summary_text.delta\",\"delta\":\"hidden\"}\n",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Done\"}\n",
+            "data: {\"type\":\"response.output_item.added\",\"item\":{\"type\":\"function_call\",\"name\":\"replace_block\"}}\n",
+            "data: {\"type\":\"response.output_item.added\",\"item\":{\"type\":\"function_call\",\"name\":\"shell\"}}\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n",
+        );
+        let mut progress = Vec::new();
+        responses_stream(Provider::Openai, body.as_bytes(), |event| {
+            progress.push(event)
+        })
+        .unwrap();
+        assert_eq!(
+            progress,
+            vec![
+                ChatProgress::Text {
+                    delta: "Done".into()
+                },
+                ChatProgress::Edit {
+                    tool: "replace_block".into()
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn streamed_usage_limits_explain_themselves() {
         let body = "data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"subscription_sharing_usage_limit_exceeded\"}}}\n";
         assert!(
-            final_streamed_response(body.as_bytes())
+            responses_stream(Provider::Chatgpt, body.as_bytes(), |_| {})
                 .unwrap_err()
                 .contains("usage limit")
         );
-        assert!(final_streamed_response(b"data: {\"type\":\"response.created\"}\n").is_err());
+        assert!(
+            responses_stream(
+                Provider::Chatgpt,
+                &b"data: {\"type\":\"response.created\"}\n"[..],
+                |_| {}
+            )
+            .is_err()
+        );
     }
 
     /// A reply's text and completion, for replies that call no tools.

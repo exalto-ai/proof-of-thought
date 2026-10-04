@@ -539,7 +539,7 @@ Provider response text stays visible chat; it does not enter the document or att
 itself. Edits reach the note only through the tools in AD-24.
 
 **Cost:** local browser storage can be cleared, unavailable, or overwritten by another window, and
-history does not follow the document to another device. There is still no streaming or Stop. A
+history does not follow the document to another device. Replies stream, but there is no Stop. A
 failed request may have reached the provider even when the window receives no answer. Reviewable
 document changes remain a separate suggestion operation rather than an implicit power of chat.
 

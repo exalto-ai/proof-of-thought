@@ -14,7 +14,10 @@ Provider default omits an effort setting. Low, Medium, and High map to OpenAI
 `reasoning.effort` and Anthropic `output_config.effort`. These are requested settings, not observed
 or verified reasoning. Hidden reasoning blocks are never returned to the WebView.
 
-The transport remains non-streaming and has no native transcript database, provider-side
+Every provider call streams (server-sent events). As it arrives, the native side passes the window
+visible text deltas and the name of each edit tool the model starts, over a per-request Tauri
+channel; reasoning never crosses. The final reply is assembled from the same stream. The transport
+has no native transcript database, provider-side
 conversation ID, file lock, Stop command, or hidden reasoning surface. It returns bounded visible
 text, the edits the model made with its tools (see [`pro-reviewable-suggestions.md`](pro-reviewable-suggestions.md)),
 requested and reported model labels, the wording revision sent, and whether the provider reported

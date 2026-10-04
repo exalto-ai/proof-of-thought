@@ -2,6 +2,7 @@ import type {
   ChatAttachment,
   ChatEdit,
   ChatMessage,
+  ChatProgress,
   ProChatBridge,
   ProviderModel,
   SendChatResponse,
@@ -244,6 +245,12 @@ function preview(markdown: string): string {
     .replace(/[*_`~]/g, "");
   return plain.length > MAX_PREVIEW_CHARS ? `${plain.slice(0, MAX_PREVIEW_CHARS).trimEnd()}…` : plain;
 }
+
+const PENDING_VERBS: Record<ChatEdit["kind"], string> = {
+  replace_block: "Editing",
+  insert_blocks: "Adding",
+  delete_block: "Deleting",
+};
 
 const CHANGE_VERBS: Record<ChatEdit["kind"], string> = {
   replace_block: "Edit",
@@ -503,6 +510,8 @@ export function installProChat(
   let messages: LocalMessage[] = [];
   let stagedAttachments: StagedAttachment[] = [];
   let pendingText: string | null = null;
+  /** The reply as it streams in, while `pendingText` is out. */
+  let pendingReply: { text: string; edits: ChatEdit["kind"][]; applying: boolean } | null = null;
   let providers: ProProvider[] = [];
   /** Model lists per configured provider, loaded once per session. */
   const catalog = new Map<ProProvider, ProviderModel[]>();
@@ -702,12 +711,40 @@ export function installProChat(
     return item;
   }
 
+  /** The reply so far: streamed text, then a line per edit as it starts. */
+  function pendingReplyElement(reply: NonNullable<typeof pendingReply>): HTMLLIElement {
+    const item = root.createElement("li");
+    item.dataset.role = "assistant";
+    item.dataset.pending = "true";
+    if (reply.text) {
+      const text = root.createElement("p");
+      text.textContent = reply.text;
+      item.append(text);
+    }
+    const status = root.createElement("div");
+    status.className = "pro-chat-progress";
+    status.setAttribute("aria-live", "polite");
+    const lines = reply.edits.map((kind) => `${PENDING_VERBS[kind]}…`);
+    if (reply.applying) lines.push("Updating the note…");
+    else if (!reply.text && lines.length === 0) lines.push("Thinking…");
+    for (const line of lines) {
+      const row = root.createElement("span");
+      row.textContent = line;
+      status.append(row);
+    }
+    if (lines.length > 0) item.append(status);
+    return item;
+  }
+
   function renderMessages(): void {
     const rendered = messages.map((message) => messageElement(message));
     if (pendingText !== null) {
-      rendered.push(messageElement({ role: "user", text: pendingText }, true));
+      rendered.push(messageElement({ role: "user", text: pendingText }));
+      if (pendingReply) rendered.push(pendingReplyElement(pendingReply));
     }
     messagesElement.replaceChildren(...rendered);
+    // Keep the newest turn in view while it arrives.
+    if (pendingText !== null) messagesElement.scrollTop = messagesElement.scrollHeight;
     messagesElement.hidden = rendered.length === 0;
     empty.hidden = rendered.length !== 0;
     if (newChat) newChat.hidden = messages.length === 0 && pendingText === null;
@@ -784,6 +821,7 @@ export function installProChat(
     requestGeneration += 1;
     retry.hidden = true;
     pendingText = null;
+    pendingReply = null;
     input.value = "";
     clearAttachments();
     setError(null);
@@ -1016,9 +1054,16 @@ export function installProChat(
       size_bytes: attachment.sizeBytes,
     }));
     pendingText = message;
+    pendingReply = { text: "", edits: [], applying: false };
     input.value = "";
     setError(null);
     render();
+    const onProgress = (progress: ChatProgress) => {
+      if (destroyed || generation !== requestGeneration || pendingReply === null) return;
+      if (progress.kind === "text") pendingReply.text += progress.delta;
+      else pendingReply.edits.push(progress.tool);
+      renderMessages();
+    };
     try {
       const chatResponse = await bridge.send({
         document_title: document.title,
@@ -1031,7 +1076,7 @@ export function installProChat(
         focus_text: null,
         attachments: requestAttachments,
         disclosure_version: 2,
-      });
+      }, onProgress);
       if (destroyed || generation !== requestGeneration || currentDocument?.id !== document.id) {
         return;
       }
@@ -1050,6 +1095,10 @@ export function installProChat(
       const suggestionRequestId = createRequestId();
       if (!validSuggestionRequestId(suggestionRequestId)) {
         throw new Error("Proof of Thought could not create a safe suggestion retry identifier.");
+      }
+      if (chatResponse.edits.length > 0 && pendingReply) {
+        pendingReply.applying = true;
+        renderMessages();
       }
       const changes = await applyEdits(document, chatResponse, blockIds, suggestionRequestId, mode);
       if (destroyed || generation !== requestGeneration || currentDocument?.id !== document.id) {
@@ -1091,6 +1140,7 @@ export function installProChat(
     } finally {
       if (!destroyed && generation === requestGeneration) {
         pendingText = null;
+        pendingReply = null;
         render();
       }
     }

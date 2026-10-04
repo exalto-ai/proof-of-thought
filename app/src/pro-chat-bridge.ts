@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import type { ProProvider } from "./pro-provider-bridge";
 
 export type ProviderModel = { id: string; display_name: string };
@@ -47,14 +47,26 @@ export type SendChatResponse = {
   complete: boolean;
 };
 
+/** What arrives while a reply streams: visible text, and each edit as it starts. */
+export type ChatProgress =
+  | { kind: "text"; delta: string }
+  | { kind: "edit"; tool: ChatEdit["kind"] };
+
 export type ProChatBridge = {
   models(provider: ProProvider): Promise<ProviderModels>;
-  send(request: SendChatRequest): Promise<SendChatResponse>;
+  send(
+    request: SendChatRequest,
+    onProgress?: (progress: ChatProgress) => void,
+  ): Promise<SendChatResponse>;
 };
 
 export function tauriProChatBridge(): ProChatBridge {
   return {
     models: (provider) => invoke<ProviderModels>("provider_models", { provider }),
-    send: (request) => invoke<SendChatResponse>("send_provider_chat", { request }),
+    send: (request, onProgress) => {
+      const channel = new Channel<ChatProgress>();
+      if (onProgress) channel.onmessage = onProgress;
+      return invoke<SendChatResponse>("send_provider_chat", { request, onProgress: channel });
+    },
   };
 }

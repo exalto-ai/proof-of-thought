@@ -295,6 +295,46 @@ describe("built-in chat", () => {
     controller.destroy();
   });
 
+  it("shows the reply as it streams, then the finished message", async () => {
+    let progress: ((event: import("./pro-chat-bridge").ChatProgress) => void) | undefined;
+    let finish!: (value: Awaited<ReturnType<ProChatBridge["send"]>>) => void;
+    const bridge = chatBridge({
+      send: vi.fn().mockImplementation((_request, onProgress) => {
+        progress = onProgress;
+        return new Promise((resolve) => { finish = resolve; });
+      }),
+    });
+    const controller = installChat({ bridge, suggestEdit: vi.fn() });
+    controller.setActive(true);
+    controller.setDocument(chatDocument());
+    await chooseOpenAi(bridge);
+    compose("Tighten it");
+    submitChat();
+
+    const pending = () => document.querySelector('#pro-chat-messages li[data-pending="true"]');
+    await vi.waitFor(() => expect(pending()?.textContent).toBe("Thinking…"));
+    expect(document.querySelector('#pro-chat-messages li[data-role="user"]')?.textContent)
+      .toContain("Tighten it");
+    progress!({ kind: "text", delta: "Tightening " });
+    progress!({ kind: "text", delta: "it." });
+    progress!({ kind: "edit", tool: "replace_block" });
+    expect(pending()?.textContent).toBe("Tightening it.Editing…");
+
+    finish({
+      text: "Tightening it.",
+      edits: [],
+      provider: "openai",
+      requested_model: "gpt-test",
+      reported_model: null,
+      wording_revision: "revision-1",
+      complete: true,
+    });
+    await vi.waitFor(() => expect(pending()).toBeNull());
+    expect(document.querySelector('#pro-chat-messages li[data-role="assistant"]')?.textContent)
+      .toContain("Tightening it.");
+    controller.destroy();
+  });
+
   it("applies edits directly in a note set to Edit mode, remembered per note", async () => {
     const bridge = chatBridge({
       send: vi.fn().mockResolvedValue({
@@ -616,7 +656,7 @@ describe("built-in chat", () => {
       compose(`Question ${index}`);
       submitChat();
       await vi.waitFor(() => expect(document.querySelectorAll(
-        '#pro-chat-messages li[data-role="assistant"]',
+        '#pro-chat-messages li[data-role="assistant"]:not([data-pending])',
       )).toHaveLength(index + 1));
     }
     const key = "thought.pro-chat.v1.private-document-id";
@@ -626,7 +666,7 @@ describe("built-in chat", () => {
     compose("Question 9");
     submitChat();
     await vi.waitFor(() => expect(document.querySelectorAll(
-      '#pro-chat-messages li[data-role="assistant"]',
+      '#pro-chat-messages li[data-role="assistant"]:not([data-pending])',
     )).toHaveLength(10));
     expect(document.querySelector<HTMLElement>("#pro-chat-storage-notice")!.hidden)
       .toBe(false);
