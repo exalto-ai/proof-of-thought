@@ -6,8 +6,9 @@ import type {
 import { required } from "./dom";
 import { oneLine } from "./notices";
 
-const PROVIDERS: readonly ProProvider[] = ["openai", "anthropic"];
+const PROVIDERS: readonly ProProvider[] = ["chatgpt", "openai", "anthropic"];
 const NAMES: Record<ProProvider, string> = {
+  chatgpt: "ChatGPT",
   openai: "OpenAI",
   anthropic: "Anthropic",
 };
@@ -15,6 +16,10 @@ const NAMES: Record<ProProvider, string> = {
 type Options = {
   bridge?: ProProviderBridge | null;
   onNotice?: (message: string, kind?: "info" | "error") => void;
+  /** After a ChatGPT sign-in completes. */
+  onSignedIn?: () => void;
+  /** Open ChatGPT's usage settings. */
+  openUsage?: () => void;
 };
 
 export type ProProviderController = {
@@ -29,6 +34,7 @@ export function installProProvider(
   const error = required<HTMLElement>(panel, "#provider-error", "provider");
   const bridge = options.bridge ?? null;
   const configured = new Map<ProProvider, boolean>();
+  let account = "";
   const disposers: Array<() => void> = [];
   let busy: ProProvider | null = null;
   let destroyed = false;
@@ -46,12 +52,27 @@ export function installProProvider(
       const status = required<HTMLElement>(container, "[data-provider-status]", "provider");
       const configure = required<HTMLButtonElement>(container, "[data-provider-configure]", "provider");
       const remove = required<HTMLButtonElement>(container, "[data-provider-remove]", "provider");
-      status.textContent = isConfigured ? "Key saved" : "No key";
       status.dataset.configured = String(isConfigured);
-      configure.textContent = isConfigured ? "Replace" : "Add key";
       configure.disabled = busy !== null || bridge === null;
       remove.hidden = !isConfigured;
       remove.disabled = busy !== null || bridge === null;
+      if (provider === "chatgpt") {
+        // A sign-in, not a key: Continue with ChatGPT, then Sign Out.
+        const waiting = busy === "chatgpt";
+        status.textContent = waiting
+          ? "Finish signing in in your browser…"
+          : isConfigured
+            ? account ? `Signed in as ${account}` : "Signed in"
+            : "Not signed in";
+        configure.hidden = isConfigured || waiting;
+        const cancel = container.querySelector<HTMLButtonElement>("[data-provider-cancel]");
+        if (cancel) cancel.hidden = !waiting;
+        const manage = container.querySelector<HTMLButtonElement>("[data-provider-manage]");
+        if (manage) manage.hidden = !isConfigured;
+        continue;
+      }
+      status.textContent = isConfigured ? "Key saved" : "No key";
+      configure.textContent = isConfigured ? "Replace" : "Add key";
     }
   }
 
@@ -59,6 +80,7 @@ export function installProProvider(
     if (PROVIDERS.includes(configuration.provider)) {
       configured.set(configuration.provider, configuration.configured);
     }
+    if (configuration.provider === "chatgpt") account = configuration.account ?? "";
   }
 
   async function refresh(): Promise<void> {
@@ -87,14 +109,20 @@ export function installProProvider(
       const result = await bridge.configure(provider);
       if (destroyed) return;
       apply(result.configuration);
-      if (result.outcome === "saved") {
+      if (result.outcome === "saved" && provider === "chatgpt") {
+        options.onNotice?.("Signed in to ChatGPT.");
+        options.onSignedIn?.();
+      } else if (result.outcome === "saved") {
         options.onNotice?.(`${NAMES[provider]} key saved in Keychain.`);
       }
     } catch (cause) {
       if (destroyed) return;
       error.textContent = oneLine(cause, "Provider setup failed.");
       error.hidden = false;
-      options.onNotice?.(`Could not save ${NAMES[provider]} key.`, "error");
+      options.onNotice?.(
+        provider === "chatgpt" ? "Could not sign in to ChatGPT." : `Could not save ${NAMES[provider]} key.`,
+        "error",
+      );
     } finally {
       if (!destroyed) {
         busy = null;
@@ -113,7 +141,9 @@ export function installProProvider(
       if (destroyed) return;
       apply(result.configuration);
       if (result.outcome === "removed") {
-        options.onNotice?.(`${NAMES[provider]} key removed from Keychain.`);
+        options.onNotice?.(
+          provider === "chatgpt" ? "Signed out of ChatGPT." : `${NAMES[provider]} key removed from Keychain.`,
+        );
       }
     } catch (cause) {
       if (destroyed) return;
@@ -140,6 +170,19 @@ export function installProProvider(
       () => removeButton.removeEventListener("click", onRemove),
     );
   }
+
+  // ChatGPT's extra controls: cancel a waiting sign-in, and manage usage.
+  const chatgpt = panel.querySelector<HTMLElement>('[data-provider="chatgpt"]');
+  const cancel = chatgpt?.querySelector<HTMLButtonElement>("[data-provider-cancel]");
+  const manage = chatgpt?.querySelector<HTMLButtonElement>("[data-provider-manage]");
+  const onCancel = () => void bridge?.cancelSignIn();
+  const onManage = () => options.openUsage?.();
+  cancel?.addEventListener("click", onCancel);
+  manage?.addEventListener("click", onManage);
+  disposers.push(
+    () => cancel?.removeEventListener("click", onCancel),
+    () => manage?.removeEventListener("click", onManage),
+  );
 
   render();
   void refresh();

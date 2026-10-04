@@ -24,6 +24,7 @@ function providers(configured: ProviderConfiguration["provider"][]): ProProvider
     ),
     configure: vi.fn(),
     remove: vi.fn(),
+    cancelSignIn: vi.fn(),
   };
 }
 

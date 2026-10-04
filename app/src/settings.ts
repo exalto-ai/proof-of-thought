@@ -7,6 +7,7 @@
  * daemon for connected-app credentials. This window holds no state of its own.
  */
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { PROVIDER_KEYS_CHANGED_STORAGE_KEY } from "./ai-support";
 import { readItem, safeLocalStorage, writeItem } from "./storage";
 import { ICONS, icon } from "./icons";
@@ -14,6 +15,7 @@ import { EditorApi } from "./editor-api";
 import { Mcp, type DocumentSummary } from "./mcp";
 import { installProProvider } from "./pro-provider";
 import {
+  CHATGPT_USAGE_URL,
   tauriProProviderBridge,
   type ProProviderBridge,
 } from "./pro-provider-bridge";
@@ -173,11 +175,29 @@ function announcingBridge(bridge: ProProviderBridge): ProProviderBridge {
     configure: (provider) =>
       bridge.configure(provider).finally(announceProviderChange),
     remove: (provider) => bridge.remove(provider).finally(announceProviderChange),
+    cancelSignIn: () => bridge.cancelSignIn(),
   };
+}
+
+/** OpenAI asks that the plan notice appear once, after the first sign-in. */
+const CHATGPT_WELCOME_STORAGE_KEY = "thought.chatgpt-welcome-shown.v1";
+const welcome = required<HTMLElement>(document, "#chatgpt-welcome", "settings");
+const welcomeOk = required<HTMLButtonElement>(document, "#chatgpt-welcome-ok", "settings");
+welcomeOk.addEventListener("click", () => {
+  welcome.hidden = true;
+});
+
+function showChatgptWelcome() {
+  if (readItem(storage, CHATGPT_WELCOME_STORAGE_KEY)) return;
+  writeItem(storage, CHATGPT_WELCOME_STORAGE_KEY, "true");
+  welcome.hidden = false;
+  welcomeOk.focus();
 }
 
 installProProvider(document, {
   bridge: isTauri() ? announcingBridge(tauriProProviderBridge()) : null,
+  onSignedIn: showChatgptWelcome,
+  openUsage: () => void openUrl(CHATGPT_USAGE_URL).catch(() => notify("Could not open ChatGPT settings.", "error")),
   onNotice: notify,
 });
 

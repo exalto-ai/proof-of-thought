@@ -662,6 +662,69 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 }
 .current-sources li span { color: var(--ink-faint); font-size: 11px; text-transform: capitalize; }
 
+/* ---------- Sign in with ChatGPT ---------- */
+/* OpenAI's logo, drawn in the current text colour from the official asset. */
+.chatgpt-logo {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  background: currentColor;
+  -webkit-mask: url("./assets/chatgpt-logo.svg") center / contain no-repeat;
+  mask: url("./assets/chatgpt-logo.svg") center / contain no-repeat;
+}
+/* "Continue with ChatGPT": black with the white logo, per OpenAI's buttons. */
+.settings button.chatgpt-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #000;
+  color: #fff;
+  font: 500 13px var(--sans);
+  cursor: default;
+}
+.settings button.chatgpt-button:hover:not(:disabled) { background: #222; }
+.settings button.chatgpt-button[hidden] { display: none; }
+.chatgpt-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 10px;
+  color: var(--ink-faint);
+  font-size: 11.5px;
+}
+.chatgpt-indicator[hidden] { display: none; }
+.chatgpt-indicator .chatgpt-logo { width: 12px; height: 12px; }
+.settings-subsection { margin-top: 26px !important; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--overlay);
+}
+.modal-backdrop[hidden] { display: none; }
+.modal {
+  max-width: 340px;
+  padding: 24px 24px 20px;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--raised);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.modal h2 { margin: 10px 0 6px; font: 600 15px/1.3 var(--sans); }
+.modal p { margin: 0 0 16px; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+.modal-logo { width: 28px; height: 28px; color: var(--ink); }
+
 /* ---------- shared form pieces ---------- */
 .reviewer-heading-actions,
 .reviewer-actions {

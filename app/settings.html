@@ -41,10 +41,24 @@
       </div>
 
       <div class="settings-pane" role="tabpanel" id="pane-chat" aria-labelledby="tab-chat" hidden>
-      <section class="settings-section provider-settings" id="provider-settings" aria-labelledby="provider-settings-title">
-        <h2 id="provider-settings-title">Provider keys</h2>
-        <p class="settings-note">Add a key to chat about the current document from the AI sidebar. Keys stay in your Mac login Keychain, and adding one sends no document text. Provider API charges apply to each request.</p>
+      <section class="settings-section provider-settings" id="provider-settings" aria-labelledby="chatgpt-plan-title">
         <p class="reviewer-error" id="provider-error" role="alert" hidden></p>
+        <h2 id="chatgpt-plan-title">Use your ChatGPT plan</h2>
+        <p class="settings-note">Complete eligible AI requests in this app with usage included in your ChatGPT plan or credits balance.</p>
+        <ul class="settings-group provider-list">
+          <li class="settings-row" data-provider="chatgpt">
+            <div><strong>ChatGPT</strong><span data-provider-status>Not signed in</span></div>
+            <div class="reviewer-actions">
+              <button type="button" data-provider-manage hidden>Manage usage</button>
+              <button type="button" data-provider-remove hidden>Sign Out</button>
+              <button type="button" data-provider-cancel hidden>Cancel</button>
+              <button type="button" class="chatgpt-button" data-provider-configure><span class="chatgpt-logo" aria-hidden="true"></span>Continue with ChatGPT</button>
+            </div>
+          </li>
+        </ul>
+
+        <h2 id="provider-settings-title" class="settings-subsection">API keys</h2>
+        <p class="settings-note">Or add a key to chat about the current document from the AI sidebar. Keys stay in your Mac login Keychain, and adding one sends no document text. Provider API charges apply to each request.</p>
         <ul class="settings-group provider-list">
           <li class="settings-row" data-provider="openai">
             <div><strong>OpenAI</strong><span data-provider-status>No key</span></div>
@@ -122,6 +136,15 @@
       </section>
       </div>
     </main>
+
+    <div class="modal-backdrop" id="chatgpt-welcome" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="chatgpt-welcome-title" aria-describedby="chatgpt-welcome-text">
+        <span class="chatgpt-logo modal-logo" aria-hidden="true"></span>
+        <h2 id="chatgpt-welcome-title">You're using your ChatGPT plan</h2>
+        <p id="chatgpt-welcome-text">Eligible usage in this app uses your ChatGPT plan. Manage usage in your ChatGPT settings.</p>
+        <button type="button" id="chatgpt-welcome-ok">Got it</button>
+      </section>
+    </div>
 
     <div class="toast" id="toast" role="status" hidden></div>
   </body>

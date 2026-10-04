@@ -47,6 +47,7 @@ export function installAiSupport(
   const setupPanel = required<HTMLElement>(root, "#ai-chat-setup", "AI sidebar");
   const chatPanel = required<HTMLElement>(root, "#pro-chat", "AI sidebar");
   const providerSelect = required<HTMLSelectElement>(root, "#pro-chat-provider", "AI sidebar");
+  const planIndicator = required<HTMLElement>(root, "#pro-chat-plan", "AI sidebar");
   const openSettings = required<HTMLButtonElement>(root, "#ai-chat-setup-open", "AI sidebar");
   required<HTMLElement>(root, "#ai-chat-setup-icon", "AI sidebar").replaceChildren(
     icon(ICONS.messageSquare),
@@ -87,6 +88,11 @@ export function installAiSupport(
     providerSelect.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
+  /** OpenAI asks that chat say when it is running on the ChatGPT plan. */
+  function renderPlanIndicator() {
+    planIndicator.hidden = providerSelect.value !== "chatgpt";
+  }
+
   function render() {
     const hasKey = configured.size > 0;
     for (const option of providerSelect.options) {
@@ -96,6 +102,7 @@ export function installAiSupport(
     chatPanel.hidden = !hasKey;
     chat.setActive(panel.isOpen() && hasKey);
     if (panel.isOpen() && hasKey) preferConfiguredProvider();
+    renderPlanIndicator();
   }
 
   async function refreshProviders() {
@@ -116,6 +123,7 @@ export function installAiSupport(
   }
 
   listen(openSettings, "click", () => void options.openSettings?.());
+  listen(providerSelect, "change", renderPlanIndicator);
   listen(window, "focus", () => void refreshProviders());
   listen(window, "storage", (event) => {
     if ((event as StorageEvent).key === PROVIDER_KEYS_CHANGED_STORAGE_KEY) {
@@ -130,6 +138,7 @@ export function installAiSupport(
     setCurrentDocument(context) {
       chat.setDocument(context);
       if (panel.isOpen() && configured.size > 0) preferConfiguredProvider();
+      renderPlanIndicator();
     },
     destroy() {
       for (const dispose of disposers.splice(0)) dispose();

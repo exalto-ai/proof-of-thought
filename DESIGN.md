@@ -21,7 +21,8 @@ document or it does not belong in the app.
 | Negative text | `#f0aaa4` | Negative status copy on the ground |
 
 These are defined in [`app/src/styles.css`](app/src/styles.css). Interface code should use the tokens; the
-only literal colour outside them is white text on a person's presence colour. The light palette
+only literal colours outside them are white text on a person's presence colour and OpenAI's
+black-and-white "Continue with ChatGPT" button, whose look their guidelines fix. The light palette
 is written twice there, for Auto and for pinned Light, and `theme-palette.test.ts` keeps the two
 copies identical and in step with the dark token set.
 

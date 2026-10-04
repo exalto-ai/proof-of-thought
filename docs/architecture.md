@@ -956,7 +956,14 @@ Configuration lives in one app-wide Settings window (Proof of Thought → Settin
 out like a Mac app's Settings with General, Chat, and Connections toolbar tabs (⌘1–⌘3):
 appearance, provider keys for built-in chat, and connections to reviewer apps. The sidebar only asks whether a
 provider key exists; with none it points to Settings, and with exactly one it selects that
-provider. There are no AI modes and no first-launch chooser. Connected reviewer proposals and
+provider. Built-in chat can also run on the
+user's ChatGPT plan through OpenAI's Sign in with ChatGPT for open-source, locally hosted apps: a
+browser sign-in returning to a loopback-only callback with PKCE, tokens in the login Keychain,
+and Responses API requests that stream and do not store. OpenAI's required notice, "Using
+ChatGPT plan" indicator, and Manage usage link are shown. **Cost:** the flow is a preview tied
+to OpenAI's terms and eligibility (open source and locally hosted); a paid or hosted build would
+need their partner approval, and an ID token is trusted on TLS from the token endpoint rather
+than by signature. There are no AI modes and no first-launch chooser. Connected reviewer proposals and
 built-in chat wording both use the existing Accept/Reject suggestion flow by default. A connected
 app is scoped to all documents or to one document chosen in Settings.
 

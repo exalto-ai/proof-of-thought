@@ -13,6 +13,7 @@ import { required } from "./dom";
 import { oneLine } from "./notices";
 
 const PROVIDER_NAMES: Record<ProProvider, string> = {
+  chatgpt: "ChatGPT",
   openai: "OpenAI",
   anthropic: "Anthropic",
 };
@@ -103,7 +104,7 @@ export type ProChatController = {
 };
 
 function provider(value: unknown): ProProvider | null {
-  return value === "openai" || value === "anthropic" ? value : null;
+  return value === "chatgpt" || value === "openai" || value === "anthropic" ? value : null;
 }
 
 function thinkingLevel(value: unknown): ThinkingLevel | null {

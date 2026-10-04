@@ -51,7 +51,7 @@
         <section class="empty-state ai-chat-setup" id="ai-chat-setup" hidden>
           <span class="empty-state-icon" id="ai-chat-setup-icon" aria-hidden="true"></span>
           <p class="empty-state-title">Chat about this note</p>
-          <p class="empty-state-detail">Add an OpenAI or Anthropic key to start.</p>
+          <p class="empty-state-detail">Sign in with ChatGPT or add an API key to start.</p>
           <button class="empty-state-action" id="ai-chat-setup-open" type="button">Open Settings</button>
         </section>
 
@@ -65,6 +65,7 @@
             <label><span class="sr-only">Provider</span>
               <select id="pro-chat-provider" aria-label="Provider">
                 <option value="">Provider…</option>
+                <option value="chatgpt">ChatGPT plan</option>
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Anthropic</option>
               </select>
@@ -81,6 +82,7 @@
               </select>
             </label>
           </div>
+          <p class="chatgpt-indicator" id="pro-chat-plan" hidden><span class="chatgpt-logo" aria-hidden="true"></span>Using ChatGPT plan</p>
           <p class="reviewer-error" id="pro-chat-error" role="alert" hidden></p>
           <p class="ai-sidebar-note pro-chat-storage-notice" id="pro-chat-storage-notice" role="status" hidden></p>
           <button class="text-button" id="pro-chat-retry" type="button" hidden>Try again</button>
