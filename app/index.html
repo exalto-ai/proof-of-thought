@@ -45,8 +45,15 @@
       </div>
 
       <div class="side-panel-resizer" id="ai-sidebar-resizer" role="separator" aria-orientation="vertical" aria-controls="ai-support-sidebar" aria-label="Resize AI sidebar" tabindex="0" hidden></div>
-      <aside class="side-panel ai-sidebar" id="ai-support-sidebar" data-side-panel aria-label="AI" tabindex="-1" hidden>
-        <div class="titlebar" data-tauri-drag-region></div>
+      <aside class="side-panel ai-sidebar" id="ai-support-sidebar" data-side-panel aria-label="Agent and proof" tabindex="-1" hidden>
+        <div class="titlebar sidebar-titlebar" data-tauri-drag-region>
+          <div class="sidebar-tabs" role="tablist" aria-label="Sidebar">
+            <button type="button" role="tab" id="ai-tab-agent" aria-controls="ai-pane-agent" aria-selected="true" data-tab="agent">Agent</button>
+            <button type="button" role="tab" id="ai-tab-proof" aria-controls="ai-pane-proof" aria-selected="false" data-tab="proof">Proof</button>
+          </div>
+        </div>
+
+        <div class="sidebar-pane" id="ai-pane-agent" role="tabpanel" aria-labelledby="ai-tab-agent">
 
         <section class="empty-state ai-chat-setup" id="ai-chat-setup" hidden>
           <span class="empty-state-icon" id="ai-chat-setup-icon" aria-hidden="true"></span>
@@ -95,6 +102,9 @@
           </form>
         </section>
 
+        </div>
+
+        <div class="sidebar-pane" id="ai-pane-proof" role="tabpanel" aria-labelledby="ai-tab-proof" hidden>
         <section class="current-sources" aria-labelledby="current-sources-title">
           <h3 id="current-sources-title">Sources</h3>
           <p id="current-source-status" aria-live="polite">Open a document to see its sources.</p>
@@ -102,6 +112,7 @@
           <ul id="current-source-list" hidden></ul>
           <p class="ai-sidebar-note" id="current-source-note" hidden>These labels describe how surviving text entered this document. They do not prove who composed pasted, imported, or tool-reported text.</p>
         </section>
+        </div>
       </aside>
     </div>
 

@@ -71,7 +71,7 @@ ledger.
 
 ## Current sources view
 
-The AI support sidebar reads `document_lineage` directly and groups sources already present in
+The right sidebar's Proof tab reads `document_lineage` directly and groups sources already present in
 the response. It shows labels, assurance, and alignment. It does not expose percentages, build a
 separate consumer ledger, or replay event history in the browser.
 

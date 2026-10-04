@@ -5,10 +5,11 @@ import { installProChat, type ProChatDocument } from "./pro-chat";
 import { required } from "./dom";
 import { ICONS, icon } from "./icons";
 import { installSidePanel } from "./side-panel";
-import { safeLocalStorage } from "./storage";
+import { readItem, safeLocalStorage, writeItem } from "./storage";
 
 export const AI_SIDEBAR_OPEN_STORAGE_KEY = "thought.ai-sidebar-open.v1";
 export const AI_SIDEBAR_WIDTH_STORAGE_KEY = "thought.ai-sidebar-width.v1";
+export const AI_SIDEBAR_TAB_STORAGE_KEY = "thought.ai-sidebar-tab.v1";
 /** Settings bumps this after a key changes so open windows re-check. */
 export const PROVIDER_KEYS_CHANGED_STORAGE_KEY = "thought.provider-keys-changed";
 
@@ -118,6 +119,32 @@ export function installAiSupport(
   }
 
   listen(openSettings, "click", () => void options.openSettings?.());
+
+  // Agent (chat) and Proof (where the text came from), one at a time.
+  const tabs = [...sidebar.querySelectorAll<HTMLButtonElement>('.sidebar-tabs [role="tab"]')];
+  function selectTab(name: string, focus = false) {
+    const chosen = tabs.find((tab) => tab.dataset.tab === name) ?? tabs[0];
+    for (const tab of tabs) {
+      const selected = tab === chosen;
+      tab.setAttribute("aria-selected", String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      const pane = root.getElementById(tab.getAttribute("aria-controls") ?? "");
+      if (pane) pane.hidden = !selected;
+    }
+    if (focus) chosen.focus();
+    writeItem(storage, AI_SIDEBAR_TAB_STORAGE_KEY, chosen.dataset.tab ?? "agent");
+  }
+  for (const [index, tab] of tabs.entries()) {
+    listen(tab, "click", () => selectTab(tab.dataset.tab ?? "agent"));
+    listen(tab, "keydown", (event) => {
+      const key = (event as KeyboardEvent).key;
+      const step = key === "ArrowRight" ? 1 : key === "ArrowLeft" ? -1 : 0;
+      if (step === 0) return;
+      event.preventDefault();
+      selectTab(tabs[(index + step + tabs.length) % tabs.length].dataset.tab ?? "agent", true);
+    });
+  }
+  selectTab(readItem(storage, AI_SIDEBAR_TAB_STORAGE_KEY) ?? "agent");
   listen(window, "focus", () => void refreshProviders());
   listen(window, "storage", (event) => {
     if ((event as StorageEvent).key === PROVIDER_KEYS_CHANGED_STORAGE_KEY) {

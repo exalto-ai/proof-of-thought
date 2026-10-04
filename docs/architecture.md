@@ -940,8 +940,9 @@ adjacency is why both belong to the same milestone.
 
 Each document has its own native window. ⌘K opens a switcher backed by the daemon's FTS index,
 the same `search` the agents use, so there is one search implementation rather than two. A
-right sidebar, open by default and resizable by dragging its border, holds built-in chat and the
-current text's recorded sources. A title-bar toggle is its only show/hide control, and the choice
+right sidebar, open by default and resizable by dragging its border, has two tabs in its title-bar
+row: Agent (built-in chat) and Proof (the current text's recorded sources), one at a time, the
+last one remembered. A title-bar toggle is its only show/hide control, and the choice
 and width are remembered per machine.
 
 Both sidebars run the full height of the window, as in Notes: the macOS window buttons sit

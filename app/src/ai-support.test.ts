@@ -42,6 +42,23 @@ afterEach(() => {
 });
 
 describe("AI sidebar", () => {
+  it("shows one of Agent and Proof at a time and remembers which", () => {
+    const storage = memoryStorage();
+    const controller = installAiSupport(document, { storage });
+    const agent = document.querySelector<HTMLElement>("#ai-pane-agent")!;
+    const proof = document.querySelector<HTMLElement>("#ai-pane-proof")!;
+    expect([agent.hidden, proof.hidden]).toEqual([false, true]);
+
+    document.querySelector<HTMLButtonElement>("#ai-tab-proof")!.click();
+    expect([agent.hidden, proof.hidden]).toEqual([true, false]);
+    expect(document.querySelector("#ai-tab-proof")!.getAttribute("aria-selected")).toBe("true");
+    controller.destroy();
+
+    const reopened = installAiSupport(document, { storage });
+    expect(proof.hidden).toBe(false);
+    reopened.destroy();
+  });
+
   it("is open by default with no mode chooser", () => {
     const controller = installAiSupport(document, { storage: memoryStorage() });
 
