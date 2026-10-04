@@ -367,6 +367,33 @@ describe("built-in chat", () => {
     controller.destroy();
   });
 
+  it("attaches files dropped on the composer", async () => {
+    const bridge = chatBridge();
+    const controller = installChat({ bridge });
+    controller.setActive(true);
+    controller.setDocument(chatDocument());
+    await chooseOpenAi(bridge);
+    const form = document.querySelector<HTMLFormElement>("#pro-chat-form")!;
+    const dropped = file("notes.md", "text/markdown", new TextEncoder().encode("dropped"));
+    const drag = (type: string) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "dataTransfer", {
+        value: { types: ["Files"], files: [dropped], dropEffect: "none" },
+      });
+      form.dispatchEvent(event);
+      return event;
+    };
+
+    expect(drag("dragover").defaultPrevented).toBe(true);
+    expect(form.classList.contains("is-drop-target")).toBe(true);
+    expect(drag("drop").defaultPrevented).toBe(true);
+    expect(form.classList.contains("is-drop-target")).toBe(false);
+    await vi.waitFor(() => expect(
+      document.querySelector("#pro-chat-attachments")?.textContent,
+    ).toContain("notes.md"));
+    controller.destroy();
+  });
+
   it("sends validated files once, persists only summaries, and records thinking", async () => {
     const bridge = chatBridge();
     const controller = installChat({ bridge });

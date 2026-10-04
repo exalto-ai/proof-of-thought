@@ -1016,6 +1016,28 @@ export function installProChat(
     if (!send.disabled) void submit();
   });
   listen(attach, "click", () => attachmentInput.click());
+  // Drop files on the composer to attach them, as with the attach button.
+  const composer = form.querySelector<HTMLElement>(".pro-chat-composer") ?? form;
+  const carriesFiles = (event: DragEvent) =>
+    event.dataTransfer?.types.includes("Files") === true && !attach.disabled;
+  listen(composer, "dragover", (event) => {
+    const drag = event as DragEvent;
+    if (!carriesFiles(drag)) return;
+    drag.preventDefault();
+    if (drag.dataTransfer) drag.dataTransfer.dropEffect = "copy";
+    composer.classList.add("is-drop-target");
+  });
+  listen(composer, "dragleave", (event) => {
+    const related = (event as DragEvent).relatedTarget as Node | null;
+    if (!related || !composer.contains(related)) composer.classList.remove("is-drop-target");
+  });
+  listen(composer, "drop", (event) => {
+    const drag = event as DragEvent;
+    composer.classList.remove("is-drop-target");
+    if (!carriesFiles(drag)) return;
+    drag.preventDefault();
+    void stageFiles(Array.from(drag.dataTransfer?.files ?? []));
+  });
   listen(attachmentInput, "change", () => {
     void stageFiles(Array.from(attachmentInput.files ?? []));
   });

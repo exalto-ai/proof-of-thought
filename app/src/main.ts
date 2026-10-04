@@ -694,6 +694,14 @@ async function exportMarkdownFile(target = open): Promise<boolean> {
  */
 // ---------------------------------------------------------------- keys
 
+// A file dropped anywhere but the chat composer must not make the web view
+// navigate to it; the composer handles its own drops first.
+for (const type of ["dragover", "drop"] as const) {
+  document.addEventListener(type, (event) => {
+    if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+  });
+}
+
 // File → New Note (⌘N) and New Window (⇧⌘N) are native menu items; the menu
 // hands them to the focused window, which knows which note it shows.
 if (isTauri()) {

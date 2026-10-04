@@ -474,6 +474,9 @@ fn new_window(
         // (240 + 360) beside the 768px measure and its padding.
         .inner_size(1440.0, 880.0)
         .min_inner_size(560.0, 400.0)
+        // Matches tauri.conf.json: files dropped on the page reach it as web
+        // drops, so the chat composer can attach them.
+        .disable_drag_drop_handler()
         // Position the fully constructed native window using its real outer
         // dimensions, then reveal it. This avoids a centered-window flash and
         // keeps a default-sized child on screen even when its parent is narrow.

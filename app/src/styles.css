@@ -524,6 +524,10 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   background: var(--paper);
 }
 .pro-chat-composer:focus-within { border-color: color-mix(in srgb, var(--accent) 55%, var(--rule)); }
+.pro-chat-composer.is-drop-target {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--paper));
+}
 .pro-chat textarea {
   width: 100%;
   min-height: 38px;
