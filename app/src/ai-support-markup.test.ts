@@ -25,6 +25,6 @@ describe("AI settings copy", () => {
   it("keeps configuration out of the document window", () => {
     expect(window).not.toContain('id="provider-settings"');
     expect(window).not.toContain('id="reviewer-form"');
-    expect(window).toContain("Sends this document");
+    expect(window).toContain("Sends this note");
   });
 });

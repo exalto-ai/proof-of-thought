@@ -17,7 +17,7 @@ const body = markup.slice(markup.indexOf("<body>") + 6, markup.indexOf("</body>"
 function providers(configured: ProviderConfiguration["provider"][]): ProProviderBridge {
   return {
     list: vi.fn().mockResolvedValue(
-      (["openai", "anthropic"] as const).map((provider) => ({
+      (["chatgpt", "openai", "anthropic"] as const).map((provider) => ({
         provider,
         configured: configured.includes(provider),
       })),
@@ -102,20 +102,30 @@ describe("AI sidebar", () => {
     controller.destroy();
   });
 
-  it("shows chat for configured providers and picks the only one", async () => {
+  it("shows chat for configured providers and says when the ChatGPT plan is in use", async () => {
+    const chatBridge = {
+      models: vi.fn().mockResolvedValue({
+        provider: "chatgpt",
+        models: [{ id: "gpt-plan", display_name: "GPT Plan" }],
+      }),
+      send: vi.fn(),
+    };
     const controller = installAiSupport(document, {
       storage: memoryStorage(),
-      providerBridge: providers(["anthropic"]),
+      providerBridge: providers(["chatgpt"]),
+      chatBridge: chatBridge as never,
     });
     await flush();
 
-    const select = document.querySelector<HTMLSelectElement>("#pro-chat-provider")!;
     expect(document.querySelector<HTMLElement>("#ai-chat-setup")!.hidden).toBe(true);
     expect(document.querySelector<HTMLElement>("#pro-chat")!.hidden).toBe(false);
-    expect(select.querySelector<HTMLOptionElement>('[value="openai"]')!.disabled).toBe(true);
-    expect(select.value).toBe("anthropic");
+    await vi.waitFor(() => expect(
+      document.querySelector<HTMLSelectElement>("#pro-chat-model")!.value,
+    ).toBe("chatgpt:gpt-plan"));
+    expect(document.querySelector<HTMLElement>("#pro-chat-plan")!.hidden).toBe(false);
     controller.destroy();
   });
+
 
   it("re-checks keys when Settings announces a change", async () => {
     const bridge = providers([]);

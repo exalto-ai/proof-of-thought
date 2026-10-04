@@ -1,10 +1,10 @@
-# Selected-text chat focus
+# Chat focus and attachments
 
-**Focus on selection** captures the current editor selection as plain text and shows it beside the
-composer. The person can remove it before Send. A successful response clears it.
-
-The native request labels and bounds this text separately from the full current document. It is a
-snapshot, not a live range: later edits do not update it, and it carries no verified provenance.
+**Removed from the composer:** a "Focus on selection" control used to capture the editor selection
+as a separate plain-text focus for one request. Its purpose was unclear in use, so the window no
+longer offers it and always sends `focus_text: null`. The native request still accepts and bounds
+an optional focus, labelled separately from the full current document, should a clearer control
+return; it would be a snapshot, not a live range, with no verified provenance.
 
 The same composer may attach PDFs and UTF-8 text files for one request. The app sends their bytes
 inline after validating them in both the WebView and native boundary. It never sends a filesystem

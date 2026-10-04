@@ -20,7 +20,10 @@ function memoryStorage(): ChatStorage {
 let storage: ChatStorage;
 
 function installChat(options: ChatOptions = {}) {
-  return installProChat(document, { storage, ...options });
+  const controller = installProChat(document, { storage, ...options });
+  // As the sidebar does: OpenAI is the one configured provider.
+  controller.setProviders(["openai"]);
+  return controller;
 }
 
 function markup(): string {
@@ -28,7 +31,6 @@ function markup(): string {
     <section id="pro-chat">
       <button id="pro-chat-new"></button>
       <p id="pro-chat-document"></p>
-      <select id="pro-chat-provider"><option value=""></option><option value="openai">OpenAI</option></select>
       <select id="pro-chat-model"></select>
       <select id="pro-chat-thinking">
         <option value="provider_default">Provider default</option>
@@ -42,8 +44,6 @@ function markup(): string {
       <p id="pro-chat-empty"></p>
       <ol id="pro-chat-messages" hidden></ol>
       <form id="pro-chat-form">
-        <button id="pro-chat-focus-capture" type="button"></button>
-        <div id="pro-chat-focus" hidden><span id="pro-chat-focus-text"></span><button id="pro-chat-focus-remove" type="button"></button></div>
         <button id="pro-chat-attach" type="button"></button>
         <input id="pro-chat-attachment-input" type="file" multiple />
         <ul id="pro-chat-attachments" hidden></ul>
@@ -87,9 +87,6 @@ function chatBridge(overrides: Partial<ProChatBridge> = {}): ProChatBridge {
 }
 
 async function chooseOpenAi(bridge: ProChatBridge): Promise<void> {
-  const provider = document.querySelector<HTMLSelectElement>("#pro-chat-provider")!;
-  provider.value = "openai";
-  provider.dispatchEvent(new Event("change"));
   await vi.waitFor(() => {
     expect(bridge.models).toHaveBeenCalledWith("openai");
     expect(document.querySelector<HTMLSelectElement>("#pro-chat-model")!.value)
@@ -188,16 +185,13 @@ describe("built-in chat", () => {
       selectedText: () => "Selected line",
     });
 
-    const provider = document.querySelector<HTMLSelectElement>("#pro-chat-provider")!;
-    provider.value = "openai";
-    provider.dispatchEvent(new Event("change"));
     await vi.waitFor(() => {
       expect(bridge.models).toHaveBeenCalledWith("openai");
       expect(bridge.models).toHaveBeenCalledTimes(1);
       expect([
         document.querySelector<HTMLSelectElement>("#pro-chat-model")!.value,
         document.querySelector("#pro-chat-error")?.textContent,
-      ]).toEqual(["gpt-test", ""]);
+      ]).toEqual(["openai:gpt-test", ""]);
     });
 
     const input = document.querySelector<HTMLTextAreaElement>("#pro-chat-input")!;
@@ -205,8 +199,6 @@ describe("built-in chat", () => {
     input.value = "Improve the ending";
     input.dispatchEvent(new Event("input"));
     expect(send.disabled).toBe(false);
-    document.querySelector<HTMLButtonElement>("#pro-chat-focus-capture")!.click();
-    expect(document.querySelector("#pro-chat-focus")?.textContent).toContain("Selected line");
 
     document.querySelector<HTMLFormElement>("#pro-chat-form")!
       .dispatchEvent(new Event("submit", { cancelable: true }));
@@ -215,7 +207,7 @@ describe("built-in chat", () => {
       document_title: "Draft",
       document: { type: "doc", content: [] },
       message: "Improve the ending",
-      focus_text: "Selected line",
+      focus_text: null,
       thinking: "provider_default",
       attachments: [],
       disclosure_version: 2,
@@ -300,7 +292,7 @@ describe("built-in chat", () => {
     controller.setActive(true);
     await vi.waitFor(() => {
       expect(document.querySelector<HTMLSelectElement>("#pro-chat-model")!.value)
-        .toBe("gpt-test");
+        .toBe("openai:gpt-test");
     });
     document.querySelector<HTMLButtonElement>(".pro-chat-suggest")!.click();
     await vi.waitFor(() => expect(suggestResponse).toHaveBeenCalledTimes(2));
@@ -320,7 +312,7 @@ describe("built-in chat", () => {
     controller.setDocument(chatDocument("one", "One"));
     await chooseOpenAi(bridge);
     const model = document.querySelector<HTMLSelectElement>("#pro-chat-model")!;
-    model.value = "gpt-second";
+    model.value = "openai:gpt-second";
     model.dispatchEvent(new Event("change"));
     const thinking = document.querySelector<HTMLSelectElement>("#pro-chat-thinking")!;
     thinking.value = "high";
@@ -336,25 +328,21 @@ describe("built-in chat", () => {
     controller.setDocument(chatDocument("two", "Two"));
     expect(document.querySelector("#pro-chat-messages")?.textContent).toBe("");
     expect(document.querySelector("#pro-chat-document")?.textContent).toContain("Two");
-    await chooseOpenAi(bridge);
-    await vi.waitFor(() => expect(storage.getItem("thought.pro-chat.v1.two"))
-      .not.toBeNull());
+    // The model choice carries over; nothing is saved for a chat never used.
+    expect(storage.getItem("thought.pro-chat.v1.two")).toBeNull();
 
     controller.setDocument(chatDocument("one", "One"));
     expect(document.querySelector("#pro-chat-messages")?.textContent).toContain("Reply");
     expect(document.querySelector("#pro-chat-messages")?.textContent)
       .toContain("High thinking requested");
-    expect(document.querySelector<HTMLSelectElement>("#pro-chat-provider")!.value)
-      .toBe("openai");
     expect(document.querySelector<HTMLSelectElement>("#pro-chat-thinking")!.value).toBe("high");
     await vi.waitFor(() => expect(document.querySelector<HTMLSelectElement>(
       "#pro-chat-model",
-    )!.value).toBe("gpt-second"));
+    )!.value).toBe("openai:gpt-second"));
 
     document.querySelector<HTMLButtonElement>("#pro-chat-new")!.click();
     expect(document.querySelector("#pro-chat-messages")?.textContent).toBe("");
     expect(storage.getItem("thought.pro-chat.v1.one")).toBeNull();
-    expect(storage.getItem("thought.pro-chat.v1.two")).not.toBeNull();
     controller.destroy();
   });
 
@@ -580,50 +568,37 @@ describe("built-in chat", () => {
     controller.destroy();
   });
 
-  it("clears invalidated model-loading state when the document changes", async () => {
+  it("keeps loading the shared model list across a document switch", async () => {
     const models = deferred<Awaited<ReturnType<ProChatBridge["models"]>>>();
     const bridge = chatBridge({ models: vi.fn().mockReturnValue(models.promise) });
     const controller = installChat({ bridge });
     controller.setActive(true);
     controller.setDocument(chatDocument("one", "One"));
-    const provider = document.querySelector<HTMLSelectElement>("#pro-chat-provider")!;
-    provider.value = "openai";
-    provider.dispatchEvent(new Event("change"));
     await vi.waitFor(() => expect(document.querySelector("#pro-chat")?.getAttribute(
       "aria-busy",
     )).toBe("true"));
 
     controller.setDocument(chatDocument("two", "Two"));
-    expect(document.querySelector("#pro-chat")?.getAttribute("aria-busy")).toBe("false");
-    expect(document.querySelector<HTMLSelectElement>("#pro-chat-model")!.disabled).toBe(true);
     models.resolve({
       provider: "openai",
-      models: [{ id: "stale-model", display_name: "Stale model" }],
+      models: [{ id: "gpt-test", display_name: "GPT Test" }],
     });
-    await models.promise;
-    await Promise.resolve();
-    expect(document.querySelector("#pro-chat")?.getAttribute("aria-busy")).toBe("false");
-    expect(document.querySelector<HTMLSelectElement>("#pro-chat-model")!.options)
-      .toHaveLength(0);
+    await vi.waitFor(() => expect(document.querySelector<HTMLSelectElement>(
+      "#pro-chat-model",
+    )!.value).toBe("openai:gpt-test"));
+    expect(bridge.models).toHaveBeenCalledTimes(1);
     controller.destroy();
   });
 
-  it("clears pending model-loading state when the provider is cleared", async () => {
+  it("drops a stale model list when the configured providers change", async () => {
     const models = deferred<Awaited<ReturnType<ProChatBridge["models"]>>>();
     const bridge = chatBridge({ models: vi.fn().mockReturnValue(models.promise) });
     const controller = installChat({ bridge });
     controller.setActive(true);
     controller.setDocument(chatDocument());
-    const provider = document.querySelector<HTMLSelectElement>("#pro-chat-provider")!;
-    provider.value = "openai";
-    provider.dispatchEvent(new Event("change"));
-    await vi.waitFor(() => expect(document.querySelector("#pro-chat")?.getAttribute(
-      "aria-busy",
-    )).toBe("true"));
+    await vi.waitFor(() => expect(bridge.models).toHaveBeenCalledOnce());
 
-    provider.value = "";
-    provider.dispatchEvent(new Event("change"));
-    expect(document.querySelector("#pro-chat")?.getAttribute("aria-busy")).toBe("false");
+    controller.setProviders([]);
     models.resolve({
       provider: "openai",
       models: [{ id: "stale-model", display_name: "Stale model" }],
@@ -631,8 +606,39 @@ describe("built-in chat", () => {
     await models.promise;
     await Promise.resolve();
     expect(document.querySelector("#pro-chat")?.getAttribute("aria-busy")).toBe("false");
-    expect(document.querySelector<HTMLSelectElement>("#pro-chat-model")!.options)
-      .toHaveLength(0);
+    expect(document.querySelector("#pro-chat-model optgroup")).toBeNull();
+    controller.destroy();
+  });
+
+  it("offers one menu with a section per provider and Configure Providers…", async () => {
+    const openSettings = vi.fn();
+    const onSelectionChange = vi.fn();
+    const bridge = chatBridge({
+      models: vi.fn((provider: string) => Promise.resolve({
+        provider,
+        models: [{ id: `${provider}-model`, display_name: `${provider} model` }],
+      })) as never,
+    });
+    const controller = installChat({ bridge, openSettings, onSelectionChange });
+    controller.setProviders(["chatgpt", "openai"]);
+    controller.setActive(true);
+    controller.setDocument(chatDocument());
+    const menu = document.querySelector<HTMLSelectElement>("#pro-chat-model")!;
+    await vi.waitFor(() => expect(menu.querySelectorAll("optgroup")).toHaveLength(2));
+
+    expect([...menu.querySelectorAll("optgroup")].map((group) => group.label))
+      .toEqual(["ChatGPT Plan", "OpenAI API"]);
+    expect(menu.value).toBe("chatgpt:chatgpt-model");
+    expect(onSelectionChange).toHaveBeenLastCalledWith("chatgpt");
+
+    menu.value = "openai:openai-model";
+    menu.dispatchEvent(new Event("change"));
+    expect(onSelectionChange).toHaveBeenLastCalledWith("openai");
+
+    menu.value = "configure";
+    menu.dispatchEvent(new Event("change"));
+    expect(openSettings).toHaveBeenCalledOnce();
+    expect(menu.value).toBe("openai:openai-model");
     controller.destroy();
   });
 
@@ -769,7 +775,7 @@ describe("built-in chat", () => {
     controller.setActive(true);
     await vi.waitFor(() => expect(document.querySelector<HTMLSelectElement>(
       "#pro-chat-model",
-    )!.value).toBe("gpt-test"));
+    )!.value).toBe("openai:gpt-test"));
     compose("One too many");
     submitChat();
     expect(document.querySelector("#pro-chat-error")?.textContent)

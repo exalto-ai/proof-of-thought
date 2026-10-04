@@ -56,52 +56,42 @@
         </section>
 
         <section class="pro-chat" id="pro-chat" aria-labelledby="pro-chat-title" hidden>
-          <div class="pro-chat-heading">
-            <h3 id="pro-chat-title">Chat</h3>
-            <button class="text-button" id="pro-chat-new" type="button" hidden>New chat</button>
+          <h3 class="sr-only" id="pro-chat-title">Chat</h3>
+          <p class="sr-only" id="pro-chat-document">Open a document to start a chat.</p>
+          <div class="pro-chat-top">
+            <button class="icon-action" id="pro-chat-new" type="button" title="New chat" aria-label="New chat" data-icon="squarePen" hidden></button>
           </div>
-          <p class="ai-sidebar-note" id="pro-chat-document">Open a document to start a chat.</p>
-          <div class="pro-chat-selectors">
-            <label><span class="sr-only">Provider</span>
-              <select id="pro-chat-provider" aria-label="Provider">
-                <option value="">Provider…</option>
-                <option value="chatgpt">ChatGPT plan</option>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-              </select>
-            </label>
-            <label><span class="sr-only">Model</span>
-              <select id="pro-chat-model" aria-label="Model" disabled></select>
-            </label>
-            <label><span class="sr-only">Thinking</span>
-              <select id="pro-chat-thinking" aria-label="Thinking" title="Thinking">
-                <option value="provider_default">Default thinking</option>
-                <option value="low">Low thinking</option>
-                <option value="medium">Medium thinking</option>
-                <option value="high">High thinking</option>
-              </select>
-            </label>
-          </div>
-          <p class="chatgpt-indicator" id="pro-chat-plan" hidden><span class="chatgpt-logo" aria-hidden="true"></span>Using ChatGPT plan</p>
-          <p class="reviewer-error" id="pro-chat-error" role="alert" hidden></p>
-          <p class="ai-sidebar-note pro-chat-storage-notice" id="pro-chat-storage-notice" role="status" hidden></p>
-          <button class="text-button" id="pro-chat-retry" type="button" hidden>Try again</button>
-          <p class="ai-sidebar-note" id="pro-chat-empty">Ask anything about this document. Useful answers can be sent to the editor as suggestions.</p>
+          <p class="pro-chat-empty" id="pro-chat-empty">Ask about this note</p>
           <ol class="pro-chat-messages" id="pro-chat-messages" aria-live="polite" hidden></ol>
+          <p class="ai-sidebar-note pro-chat-storage-notice" id="pro-chat-storage-notice" role="status" hidden></p>
+          <div class="pro-chat-error-line">
+            <p class="reviewer-error" id="pro-chat-error" role="alert" hidden></p>
+            <button class="text-button" id="pro-chat-retry" type="button" hidden>Try again</button>
+          </div>
           <form id="pro-chat-form">
-            <div class="pro-chat-focus" id="pro-chat-focus" hidden>
-              <span id="pro-chat-focus-text"></span>
-              <button class="text-button" id="pro-chat-focus-remove" type="button">Remove</button>
+            <div class="pro-chat-composer">
+              <ul id="pro-chat-attachments" hidden></ul>
+              <textarea id="pro-chat-input" maxlength="16384" rows="2" placeholder="Ask about this note…"></textarea>
+              <div class="pro-chat-composer-bar">
+                <label class="pro-chat-picker"><span class="sr-only">Model</span>
+                  <select id="pro-chat-model" aria-label="Model" disabled></select>
+                </label>
+                <label class="pro-chat-picker"><span class="sr-only">Thinking</span>
+                  <select id="pro-chat-thinking" aria-label="Thinking" title="Thinking">
+                    <option value="provider_default">Default</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </label>
+                <span class="pro-chat-spacer"></span>
+                <button class="icon-action" id="pro-chat-attach" type="button" title="Attach files — up to 5, 20 MiB total. File contents are not saved." aria-label="Attach files" data-icon="paperclip"></button>
+                <input id="pro-chat-attachment-input" type="file" accept="application/pdf,text/*,.pdf,.txt,.md,.markdown,.csv,.json,.html,.htm,.log,.xml,.yaml,.yml,.toml" multiple hidden />
+                <button class="pro-chat-send" id="pro-chat-send" type="submit" title="Send" aria-label="Send" data-icon="arrowUp" disabled></button>
+              </div>
             </div>
-            <ul id="pro-chat-attachments" hidden></ul>
-            <textarea id="pro-chat-input" maxlength="16384" rows="3" placeholder="Ask about this document…"></textarea>
-            <div class="pro-chat-composer-actions">
-              <button class="text-button" id="pro-chat-focus-capture" type="button">Focus on selection</button>
-              <button class="text-button" id="pro-chat-attach" type="button" title="Up to 5 files, 20 MiB total (PDFs up to 10 MiB, text files up to 512 KiB). File contents are not saved.">Attach</button>
-              <input id="pro-chat-attachment-input" type="file" accept="application/pdf,text/*,.pdf,.txt,.md,.markdown,.csv,.json,.html,.htm,.log,.xml,.yaml,.yml,.toml" multiple hidden />
-              <button class="ghost" id="pro-chat-send" type="submit" disabled>Send</button>
-            </div>
-            <p class="pro-chat-disclosure">Sends this document, the visible chat, and attached files to the selected provider.</p>
+            <p class="chatgpt-indicator" id="pro-chat-plan" hidden><span class="chatgpt-logo" aria-hidden="true"></span>Using ChatGPT plan</p>
+            <p class="pro-chat-disclosure">Sends this note, the chat, and attached files to the selected provider.</p>
           </form>
         </section>
 

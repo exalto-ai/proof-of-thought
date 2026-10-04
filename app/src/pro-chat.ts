@@ -12,12 +12,18 @@ import type { SuggestionPosition } from "./suggestions";
 import { required } from "./dom";
 import { oneLine } from "./notices";
 
+/** Menu sections: whose account or key a model runs on. */
+const SECTION_NAMES: Record<ProProvider, string> = {
+  chatgpt: "ChatGPT Plan",
+  openai: "OpenAI API",
+  anthropic: "Anthropic API",
+};
+const CONFIGURE_PROVIDERS = "configure";
 const PROVIDER_NAMES: Record<ProProvider, string> = {
   chatgpt: "ChatGPT",
   openai: "OpenAI",
   anthropic: "Anthropic",
 };
-const MAX_FOCUS_BYTES = 32 * 1024;
 const MAX_ATTACHMENTS = 5;
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 const MAX_TEXT_BYTES = 512 * 1024;
@@ -56,6 +62,10 @@ type Options = {
   createRequestId?: () => string;
   onNotice?: (message: string, kind?: "info" | "error") => void;
   storage?: ChatStorage | null;
+  /** Open Settings → Chat, from the menu's Configure Providers… item. */
+  openSettings?: () => void;
+  /** After the selected provider changes, e.g. to show "Using ChatGPT plan". */
+  onSelectionChange?: (provider: ProProvider | null) => void;
 };
 
 type LocalMessage = ChatMessage & {
@@ -99,6 +109,8 @@ type AttachmentSummary = {
 
 export type ProChatController = {
   setActive(active: boolean): void;
+  /** The providers with a key or sign-in, in menu order. */
+  setProviders(providers: readonly ProProvider[]): void;
   setDocument(document: ProChatDocument | null): void;
   destroy(): void;
 };
@@ -364,7 +376,6 @@ export function installProChat(
   options: Options = {},
 ): ProChatController {
   const panel = required<HTMLElement>(root, "#pro-chat", "chat");
-  const providerSelect = required<HTMLSelectElement>(panel, "#pro-chat-provider", "chat");
   const modelSelect = required<HTMLSelectElement>(panel, "#pro-chat-model", "chat");
   const thinkingSelect = required<HTMLSelectElement>(panel, "#pro-chat-thinking", "chat");
   const retry = required<HTMLButtonElement>(panel, "#pro-chat-retry", "chat");
@@ -377,10 +388,6 @@ export function installProChat(
   const input = required<HTMLTextAreaElement>(panel, "#pro-chat-input", "chat");
   const send = required<HTMLButtonElement>(panel, "#pro-chat-send", "chat");
   const newChat = required<HTMLButtonElement>(panel, "#pro-chat-new", "chat");
-  const captureFocus = required<HTMLButtonElement>(panel, "#pro-chat-focus-capture", "chat");
-  const focus = required<HTMLElement>(panel, "#pro-chat-focus", "chat");
-  const focusLabel = required<HTMLElement>(panel, "#pro-chat-focus-text", "chat");
-  const removeFocus = required<HTMLButtonElement>(panel, "#pro-chat-focus-remove", "chat");
   const attach = required<HTMLButtonElement>(panel, "#pro-chat-attach", "chat");
   const attachmentInput = required<HTMLInputElement>(panel, "#pro-chat-attachment-input", "chat");
   const attachmentList = required<HTMLUListElement>(panel, "#pro-chat-attachments", "chat");
@@ -392,8 +399,12 @@ export function installProChat(
   let stagedAttachments: StagedAttachment[] = [];
   let pendingText: string | null = null;
   let suggesting: LocalMessage | null = null;
-  let focusText: string | null = null;
-  let preferredModel = "";
+  let providers: ProProvider[] = [];
+  /** Model lists per configured provider, loaded once per session. */
+  const catalog = new Map<ProProvider, ProviderModel[]>();
+  let selectedProvider: ProProvider | null = null;
+  let selectedModel = "";
+  let modelGeneration = 0;
   let active = false;
   let loadingModels = false;
   let readingAttachments = false;
@@ -471,8 +482,8 @@ export function installProChat(
     if (storage === null || currentDocument === null) return;
     const saved: PersistedConversation = {
       version: STORAGE_VERSION,
-      provider: provider(providerSelect.value),
-      model: modelSelect.value || preferredModel,
+      provider: selectedProvider,
+      model: selectedModel,
       thinking: thinking(thinkingSelect.value),
       messages: messages.map(persistedMessage),
     };
@@ -583,36 +594,31 @@ export function installProChat(
   }
 
   function renderControls(): void {
-    const selectedProvider = provider(providerSelect.value);
-    const hasModel = modelSelect.value !== "";
+    const hasModel = selectedModel !== "";
     const busy = pendingText !== null || suggesting !== null || readingAttachments;
     documentLabel.textContent = currentDocument
       ? `Current document: ${currentDocument.title}`
       : "Open a document to start a chat.";
-    focus.hidden = focusText === null;
-    focusLabel.textContent = focusText === null
-      ? ""
-      : focusText.length > 180
-        ? `${focusText.slice(0, 177)}…`
-        : focusText;
-    providerSelect.disabled = busy;
-    captureFocus.disabled = currentDocument === null || busy;
     attach.disabled = currentDocument === null || selectedProvider === null || busy ||
       stagedAttachments.length >= MAX_ATTACHMENTS;
     attachmentInput.disabled = attach.disabled;
-    modelSelect.disabled = selectedProvider === null || loadingModels || busy;
+    modelSelect.disabled = busy;
     thinkingSelect.disabled = selectedProvider === null || !hasModel || loadingModels || busy;
     retry.disabled = loadingModels || selectedProvider === null || bridge === null || busy;
     input.disabled = currentDocument === null || busy || bridge === null;
     send.disabled = currentDocument === null || selectedProvider === null || !hasModel ||
       busy || input.value.trim() === "" || bridge === null;
     panel.setAttribute("aria-busy", String(loadingModels || busy));
-    send.textContent = pendingText === null ? "Send" : "Sending…";
+    const sending = pendingText !== null;
+    send.setAttribute("aria-label", sending ? "Sending…" : "Send");
+    send.title = sending ? "Sending…" : "Send";
+    send.dataset.pending = String(sending);
   }
 
   function render(): void {
     renderMessages();
     renderAttachments();
+    renderMenu();
     renderControls();
   }
 
@@ -625,11 +631,9 @@ export function installProChat(
 
   function clearTransientState(): void {
     requestGeneration += 1;
-    loadingModels = false;
     retry.hidden = true;
     pendingText = null;
     suggesting = null;
-    focusText = null;
     input.value = "";
     clearAttachments();
     setError(null);
@@ -642,52 +646,97 @@ export function installProChat(
     render();
   }
 
-  function replaceModels(models: ProviderModel[], preferred = ""): void {
-    const options = models.map((model) => {
-      const option = root.createElement("option");
-      option.value = model.id;
-      option.textContent = model.display_name;
-      return option;
-    });
-    modelSelect.replaceChildren(...options);
-    modelSelect.value = models.some(({ id }) => id === preferred)
-      ? preferred
-      : models[0]?.id ?? "";
-    preferredModel = modelSelect.value;
+  function selectionKey(): string {
+    return selectedProvider && selectedModel ? `${selectedProvider}:${selectedModel}` : "";
+  }
+
+  /** One pop-up: a section per configured provider, then Configure Providers…. */
+  function renderMenu(): void {
+    const children: HTMLElement[] = [];
+    for (const name of providers) {
+      const models = catalog.get(name);
+      if (!models) continue;
+      const group = root.createElement("optgroup");
+      group.label = SECTION_NAMES[name];
+      for (const model of models) {
+        const option = root.createElement("option");
+        option.value = `${name}:${model.id}`;
+        option.textContent = model.display_name;
+        group.append(option);
+      }
+      children.push(group);
+    }
+    if (children.length === 0) {
+      const placeholder = root.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = loadingModels ? "Loading models…" : "No models";
+      placeholder.disabled = true;
+      children.push(placeholder);
+    }
+    children.push(root.createElement("hr"));
+    const configure = root.createElement("option");
+    configure.value = CONFIGURE_PROVIDERS;
+    configure.textContent = "Configure Providers…";
+    children.push(configure);
+    modelSelect.replaceChildren(...children);
+    modelSelect.value = selectionKey();
+  }
+
+  /** Keep the selection on a model that exists, preferring the saved one. */
+  function ensureSelection(): void {
+    const before = selectedProvider;
+    const models = selectedProvider ? catalog.get(selectedProvider) : undefined;
+    if (models && models.some(({ id }) => id === selectedModel)) return;
+    if (models?.length) {
+      selectedModel = models[0].id;
+    } else if (selectedProvider === null || !providers.includes(selectedProvider) ||
+      catalog.size === providers.length) {
+      const first = providers.find((name) => catalog.get(name)?.length);
+      selectedProvider = first ?? null;
+      selectedModel = first ? catalog.get(first)![0].id : "";
+    }
+    if (selectedProvider !== before) options.onSelectionChange?.(selectedProvider);
   }
 
   async function loadModels(): Promise<void> {
-    const selectedProvider = provider(providerSelect.value);
-    const wantedModel = preferredModel || modelSelect.value;
-    const generation = ++requestGeneration;
-    replaceModels([], wantedModel);
-    preferredModel = wantedModel;
+    // The catalog is shared across documents, so loads are not cancelled by a
+    // document switch, and one is enough at a time.
+    if (loadingModels) return;
+    const generation = ++modelGeneration;
     retry.hidden = true;
     setError(null);
-    if (selectedProvider === null || bridge === null || !active) {
+    const missing = providers.filter((name) => !catalog.has(name));
+    if (bridge === null || !active || missing.length === 0) {
       loadingModels = false;
+      ensureSelection();
       render();
       return;
     }
     loadingModels = true;
     render();
-    try {
-      const result = await bridge.models(selectedProvider);
-      if (destroyed || generation !== requestGeneration) return;
-      if (result.provider !== selectedProvider || result.models.length === 0) {
-        throw new Error("The provider returned no usable models.");
+    const results = await Promise.allSettled(missing.map((name) => bridge.models(name)));
+    if (destroyed || generation !== modelGeneration) return;
+    let failure: unknown = null;
+    results.forEach((result, index) => {
+      const name = missing[index];
+      if (result.status === "fulfilled" && result.value.provider === name && result.value.models.length) {
+        catalog.set(name, result.value.models);
+      } else {
+        failure = result.status === "rejected"
+          ? result.reason
+          : new Error("The provider returned no usable models.");
       }
-      replaceModels(result.models, wantedModel);
-      saveConversation();
-    } catch (cause) {
-      if (destroyed || generation !== requestGeneration) return;
-      setError(oneLine(cause, "The provider request failed."));
+    });
+    loadingModels = false;
+    ensureSelection();
+    if (failure !== null) {
+      setError(oneLine(failure, "The provider request failed."));
       retry.hidden = false;
-    } finally {
-      if (!destroyed && generation === requestGeneration) {
-        loadingModels = false;
-        render();
-      }
+    }
+    saveConversation();
+    render();
+    if (active && providers.some((name) => !catalog.has(name)) && failure === null) {
+      void loadModels();
     }
   }
 
@@ -780,12 +829,11 @@ export function installProChat(
   }
 
   async function submit(): Promise<void> {
-    const selectedProvider = provider(providerSelect.value);
     const document = currentDocument;
     const message = input.value.trim();
     if (
       bridge === null || document === null || selectedProvider === null ||
-      modelSelect.value === "" || pendingText !== null ||
+      selectedModel === "" || pendingText !== null ||
       suggesting !== null || readingAttachments || !message
     ) return;
     if (messages.length >= MAX_PERSISTED_MESSAGES) {
@@ -800,7 +848,7 @@ export function installProChat(
       return;
     }
 
-    const model = modelSelect.value;
+    const model = selectedModel;
     const selectedThinking = thinking(thinkingSelect.value);
     const generation = ++requestGeneration;
     const previous = messages.map(({ role, text }) => ({ role, text }));
@@ -827,7 +875,7 @@ export function installProChat(
         thinking: selectedThinking,
         messages: previous,
         message,
-        focus_text: focusText,
+        focus_text: null,
         attachments: requestAttachments,
         disclosure_version: 2,
       });
@@ -861,7 +909,6 @@ export function installProChat(
           suggestionRequestId,
         },
       );
-      focusText = null;
       clearAttachments();
       saveConversation();
     } catch (cause) {
@@ -875,21 +922,6 @@ export function installProChat(
         render();
       }
     }
-  }
-
-  function captureSelection(): void {
-    const selected = (currentDocument?.selectedText() ?? "").trim();
-    if (!selected) {
-      setError("Select some document text first.");
-      return;
-    }
-    if (new TextEncoder().encode(selected).byteLength > MAX_FOCUS_BYTES) {
-      setError("The selected text is too large to use as chat focus.");
-      return;
-    }
-    focusText = selected;
-    setError(null);
-    renderControls();
   }
 
   async function suggestMessage(message: LocalMessage): Promise<void> {
@@ -941,20 +973,24 @@ export function installProChat(
     }
   }
 
-  listen(providerSelect, "change", () => {
-    requestGeneration += 1;
-    preferredModel = "";
-    replaceModels([]);
-    focusText = null;
-    clearAttachments();
-    if (provider(providerSelect.value) === null) saveConversation();
-    render();
-    void loadModels();
-  });
   listen(modelSelect, "change", () => {
-    preferredModel = modelSelect.value;
+    if (modelSelect.value === CONFIGURE_PROVIDERS) {
+      modelSelect.value = selectionKey();
+      options.openSettings?.();
+      return;
+    }
+    const separator = modelSelect.value.indexOf(":");
+    const chosen = provider(modelSelect.value.slice(0, separator));
+    if (separator < 0 || chosen === null) return;
+    if (chosen !== selectedProvider) {
+      // Attachment formats differ by provider; staged files do not carry over.
+      clearAttachments();
+      selectedProvider = chosen;
+      options.onSelectionChange?.(chosen);
+    }
+    selectedModel = modelSelect.value.slice(separator + 1);
     saveConversation();
-    renderControls();
+    render();
   });
   listen(thinkingSelect, "change", () => {
     thinkingSelect.value = thinking(thinkingSelect.value);
@@ -963,11 +999,6 @@ export function installProChat(
   });
   listen(retry, "click", () => void loadModels());
   listen(input, "input", renderControls);
-  listen(captureFocus, "click", captureSelection);
-  listen(removeFocus, "click", () => {
-    focusText = null;
-    renderControls();
-  });
   listen(attach, "click", () => attachmentInput.click());
   listen(attachmentInput, "change", () => {
     void stageFiles(Array.from(attachmentInput.files ?? []));
@@ -984,10 +1015,23 @@ export function installProChat(
       const activated = !active && next;
       active = next;
       renderControls();
-      if (
-        activated && provider(providerSelect.value) !== null &&
-        modelSelect.options.length === 0 && !loadingModels
-      ) void loadModels();
+      if (activated && !loadingModels && providers.some((name) => !catalog.has(name))) {
+        void loadModels();
+      }
+    },
+    setProviders(next) {
+      const changed = next.length !== providers.length || next.some((name, i) => providers[i] !== name);
+      if (!changed) return;
+      providers = [...next];
+      for (const name of [...catalog.keys()]) {
+        if (!providers.includes(name)) catalog.delete(name);
+      }
+      // A load in flight was for the old set; let the new set start afresh.
+      modelGeneration += 1;
+      loadingModels = false;
+      ensureSelection();
+      render();
+      if (active) void loadModels();
     },
     setDocument(document) {
       const changed = currentDocument?.id !== document?.id;
@@ -998,21 +1042,21 @@ export function installProChat(
       }
       clearTransientState();
       messages = [];
-      providerSelect.value = "";
       thinkingSelect.value = "provider_default";
-      preferredModel = "";
-      replaceModels([]);
+      const before = selectedProvider;
       if (document) {
         const saved = readConversation(document.id);
         if (saved) {
-          providerSelect.value = saved.provider ?? "";
+          selectedProvider = saved.provider;
+          selectedModel = saved.model;
           thinkingSelect.value = saved.thinking;
-          preferredModel = saved.model;
           messages = saved.messages;
         }
       }
+      ensureSelection();
+      if (selectedProvider !== before) options.onSelectionChange?.(selectedProvider);
       render();
-      if (active && provider(providerSelect.value) !== null) void loadModels();
+      if (active && providers.some((name) => !catalog.has(name))) void loadModels();
     },
     destroy() {
       destroyed = true;
