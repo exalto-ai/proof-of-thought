@@ -24,6 +24,7 @@ import { tauriProChatBridge } from "./pro-chat-bridge";
 import { tauriProProviderBridge } from "./pro-provider-bridge";
 import { SyncProvider, type AgentPresence, type ProviderStatus } from "./provider";
 import { installTheme } from "./theme";
+import { installToolbarPosition } from "./toolbar-position";
 import {
   installSuggestionReview,
   suggestionPositionAtSelection,
@@ -96,6 +97,7 @@ function reason(error: unknown): string {
 }
 
 installTheme(safeLocalStorage(window), getCurrentWindow());
+installToolbarPosition(safeLocalStorage(window));
 
 const aiSupport = installAiSupport(document, {
   providerBridge: isTauri() ? tauriProProviderBridge() : null,

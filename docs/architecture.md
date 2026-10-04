@@ -953,7 +953,8 @@ setting it describes.
 System sans throughout, sized and spaced for long-form writing. The dark appearance uses the
 deep-blue `#0c1622` ground shared with the app icon; a sibling light palette exists, and one
 app-wide Settings window (Proof of Thought → Settings…, ⌘,) offers Auto (follow the system),
-Light, and Dark. A compact, centered toolbar provides New, local zoom, persistent block style, font
+Light, and Dark. A compact, centered toolbar, floating at the top or bottom of the editor as
+Settings chooses, provides New, local zoom, persistent block style, font
 size, bold, italic, and link commands. Clicking linked text opens an action card with
 explicit open, copy, edit, and remove commands instead of navigating immediately. ⌘N
 creates a blank document in its own window, visibly cascaded from and leaving the current

@@ -25,6 +25,12 @@ import {
   writeTheme,
   type ThemePreference,
 } from "./theme";
+import {
+  isToolbarPosition,
+  readToolbarPosition,
+  writeToolbarPosition,
+  type ToolbarPosition,
+} from "./toolbar-position";
 
 type Connection = { mcp_url: string; token: string; stdio_command: string };
 
@@ -54,49 +60,75 @@ function reason(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// ---------------------------------------------------------------- theme
+// ---------------------------------------------------------------- appearance
+
+/**
+ * A radiogroup of segmented buttons. Arrow keys move the choice, as in a
+ * native segmented control, and only the checked button is in the tab order.
+ */
+function installChoice<T extends string>(
+  attribute: string,
+  isValue: (value: unknown) => value is T,
+  read: () => T,
+  choose: (value: T) => void,
+) {
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>(`[${attribute}]`)];
+  const render = () => {
+    const current = read();
+    for (const button of buttons) {
+      const checked = button.getAttribute(attribute) === current;
+      button.setAttribute("aria-checked", String(checked));
+      button.tabIndex = checked ? 0 : -1;
+    }
+  };
+  for (const [index, button] of buttons.entries()) {
+    button.addEventListener("click", () => {
+      const value = button.getAttribute(attribute);
+      if (!isValue(value)) return;
+      choose(value);
+      render();
+    });
+    button.addEventListener("keydown", (event) => {
+      const step = event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : 0;
+      if (step === 0) return;
+      event.preventDefault();
+      const next = buttons[(index + step + buttons.length) % buttons.length];
+      next.focus();
+      next.click();
+    });
+  }
+  render();
+  window.addEventListener("storage", render);
+}
 
 installTheme(storage, nativeWindow);
-const themeButtons = [
-  ...document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]"),
-];
+installChoice<ThemePreference>(
+  "data-theme-choice",
+  isThemePreference,
+  () => readTheme(storage),
+  (theme) => {
+    if (!writeTheme(storage, theme)) {
+      notify("The theme changed, but could not be saved for next launch.", "error");
+    }
+    applyTheme(document.documentElement, theme, nativeWindow);
+  },
+);
 
-function renderTheme(theme: ThemePreference) {
-  for (const button of themeButtons) {
-    const checked = button.dataset.themeChoice === theme;
-    button.setAttribute("aria-checked", String(checked));
-    button.tabIndex = checked ? 0 : -1;
-  }
-}
-
-function chooseTheme(theme: ThemePreference) {
-  if (!writeTheme(storage, theme)) {
-    notify("The theme changed, but could not be saved for next launch.", "error");
-  }
-  applyTheme(document.documentElement, theme, nativeWindow);
-  renderTheme(theme);
-}
-
-for (const [index, button] of themeButtons.entries()) {
-  button.addEventListener("click", () => {
-    const value = button.dataset.themeChoice;
-    if (isThemePreference(value)) chooseTheme(value);
-  });
-  button.addEventListener("keydown", (event) => {
-    const step = event.key === "ArrowRight" || event.key === "ArrowDown"
-      ? 1
-      : event.key === "ArrowLeft" || event.key === "ArrowUp"
-        ? -1
-        : 0;
-    if (step === 0) return;
-    event.preventDefault();
-    const next = themeButtons[(index + step + themeButtons.length) % themeButtons.length];
-    next.focus();
-    next.click();
-  });
-}
-renderTheme(readTheme(storage));
-window.addEventListener("storage", () => renderTheme(readTheme(storage)));
+// Settings has no toolbar of its own; document windows follow the storage event.
+installChoice<ToolbarPosition>(
+  "data-toolbar-choice",
+  isToolbarPosition,
+  () => readToolbarPosition(storage),
+  (position) => {
+    if (!writeToolbarPosition(storage, position)) {
+      notify("Could not save the toolbar position.", "error");
+    }
+  },
+);
 
 // ---------------------------------------------------------------- provider keys
 
