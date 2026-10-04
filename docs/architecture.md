@@ -938,7 +938,8 @@ current text's recorded sources. A title-bar toggle is its only show/hide contro
 and width are remembered per machine.
 
 Both sidebars run the full height of the window, as in Notes: the macOS window buttons sit
-over the documents sidebar (moved to centre on the page's 44px title-bar row), each column owns
+over the documents sidebar in their native spot, the page's title-bar row (31px) is sized to
+share their centre rather than moving them (moving them flickered during live resize), each column owns
 its own title-bar strip, and the two sidebar toggles stay pinned beside the window buttons and in
 the top-right corner whether or not their sidebars show.
 
