@@ -285,6 +285,18 @@ describe("built-in chat", () => {
     links[1].click();
     expect(focusSuggestion).toHaveBeenCalledWith("pro-chat:openai:one.2");
 
+    // Once decided in the note, a link stops being one.
+    controller.setSuggestionStates(new Map([
+      ["pro-chat:openai:one.0", "accepted"],
+      ["pro-chat:openai:one.2", "rejected"],
+    ]));
+    expect([...document.querySelectorAll<HTMLElement>(".pro-chat-change")]
+      .map((link) => [link.tagName, link.dataset.state])).toEqual([
+      ["SPAN", "accepted"],
+      ["SPAN", "rejected"],
+    ]);
+    controller.setSuggestionStates(new Map());
+
     // The links survive a restart.
     controller.destroy();
     document.body.innerHTML = markup();

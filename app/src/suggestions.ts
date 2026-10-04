@@ -290,6 +290,8 @@ export function installSuggestionReview(
   options: {
     beforeDecision?: () => Promise<boolean>;
     onNotice?: (message: string, kind?: "info" | "error") => void;
+    /** Each known suggestion's state, whenever any of them changes. */
+    onStates?: (states: ReadonlyMap<string, SuggestionState>) => void;
   } = {},
 ): SuggestionReviewController {
   const root = ydoc.getMap("suggestions");
@@ -531,6 +533,7 @@ export function installSuggestionReview(
     );
     if (active !== null && !visible.some(({ suggestion_id }) => suggestion_id === active)) active = null;
     const decorations = visible.flatMap((suggestion, index) => decorationsFor(suggestion, positions, index));
+    options.onStates?.(new Map([...suggestions].map(([id, { state }]) => [id, state])));
     const shown = active === null ? undefined : suggestions.get(active);
     if (shown) fillCard(shown);
     renderVersion += 1;

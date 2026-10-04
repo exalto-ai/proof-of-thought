@@ -412,6 +412,7 @@ async function openDocument(docId: string): Promise<boolean> {
   const suggestions = installSuggestionReview(editor, doc, docId, editorApi, {
     beforeDecision: () => provider.waitUntilSaved(),
     onNotice: notify,
+    onStates: (states) => aiSupport.setSuggestionStates(states),
   });
 
   provider.connect();

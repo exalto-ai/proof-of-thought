@@ -137,8 +137,10 @@ describe("inline suggestions", () => {
     const record = suggestion({ patch: replacement(ids[0], "Final draft") });
     const api = client(record);
     const value = editor("<p>First draft</p>");
+    const onStates = vi.fn();
     const controller = installSuggestionReview(value, ydoc, "doc-one", api, {
       beforeDecision: vi.fn(async () => true),
+      onStates,
     });
 
     await vi.waitFor(() => expect(document.querySelector(".suggestion-inserted-text")).not.toBeNull());
@@ -156,6 +158,7 @@ describe("inline suggestions", () => {
       expect(document.querySelector("[data-suggestion-id]")).toBeNull();
       expect(popover?.hidden).toBe(true);
     });
+    expect(onStates).toHaveBeenLastCalledWith(new Map([[record.suggestion_id, "accepted"]]));
     controller.destroy();
   });
 

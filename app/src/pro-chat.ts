@@ -140,6 +140,8 @@ export type ProChatController = {
   /** The providers with a key or sign-in, in menu order. */
   setProviders(providers: readonly ProProvider[]): void;
   setDocument(document: ProChatDocument | null): void;
+  /** Which suggestions in the open note are still pending, by id. */
+  setSuggestionStates(states: ReadonlyMap<string, string>): void;
   destroy(): void;
 };
 
@@ -510,6 +512,7 @@ export function installProChat(
   let messages: LocalMessage[] = [];
   let stagedAttachments: StagedAttachment[] = [];
   let pendingText: string | null = null;
+  let suggestionStates: ReadonlyMap<string, string> = new Map();
   /** The reply as it streams in, while `pendingText` is out. */
   let pendingReply: { text: string; edits: ChatEdit["kind"][]; applying: boolean } | null = null;
   let providers: ProProvider[] = [];
@@ -688,10 +691,18 @@ export function installProChat(
           ? `${CHANGE_VERBS[change.kind]}: ${change.preview}`
           : CHANGE_VERBS[change.kind];
         const target = change.applied ? change.block_id : change.suggestion_id;
-        // A deleted block has nowhere to show.
-        if (!target) {
+        const decided = change.suggestion_id === undefined
+          ? undefined
+          : suggestionStates.get(change.suggestion_id);
+        // A deleted block has nowhere to show, and a decided suggestion is
+        // done: struck through once rejected, plain once accepted.
+        if (!target || decided === "accepted" || decided === "rejected") {
           const done = root.createElement("span");
           done.className = "pro-chat-change";
+          if (decided) {
+            done.dataset.state = decided;
+            done.title = decided === "accepted" ? "Accepted" : "Rejected";
+          }
           done.textContent = label;
           changes.append(done);
           continue;
@@ -1295,6 +1306,10 @@ export function installProChat(
       ensureSelection();
       render();
       if (active) void loadModels();
+    },
+    setSuggestionStates(states) {
+      suggestionStates = states;
+      if (pendingText === null) renderMessages();
     },
     setDocument(document) {
       const changed = currentDocument?.id !== document?.id;

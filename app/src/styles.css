@@ -537,8 +537,12 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   white-space: nowrap;
   cursor: pointer;
 }
-.pro-chat-change:hover,
-.pro-chat-change:focus-visible {
+span.pro-chat-change { cursor: default; color: var(--ink-faint); }
+span.pro-chat-change[data-state="accepted"] { color: var(--ink-soft); }
+span.pro-chat-change[data-state="accepted"]::before { content: "✓ "; color: var(--status-positive); }
+span.pro-chat-change[data-state="rejected"] { text-decoration: line-through; }
+button.pro-chat-change:hover,
+button.pro-chat-change:focus-visible {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   outline: none;
 }
