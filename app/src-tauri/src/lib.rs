@@ -391,8 +391,8 @@ fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
 fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
     use tauri::menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
     let menu = Menu::default(app)?;
-    // Notes are not tabs, and a stray ⌘W used to close the whole window: drop
-    // the default ⌘W Close Window items and offer Close Window on ⇧⌘W instead.
+    // Replace the default Close Window items with one that keeps the last
+    // document window open: a stray ⌘W used to close the app's only window.
     for item in menu.items()? {
         if let MenuItemKind::Submenu(submenu) = item {
             for child in submenu.items()? {
@@ -422,7 +422,7 @@ fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
                     CLOSE_WINDOW_MENU_ID,
                     "Close Window",
                     true,
-                    Some("CmdOrCtrl+Shift+W"),
+                    Some("CmdOrCtrl+W"),
                 )?;
                 let separator = PredefinedMenuItem::separator(app)?;
                 submenu.insert_items(&[&new_note, &new_window, &separator], 0)?;
@@ -869,9 +869,18 @@ pub fn run() {
                     }
                 }
                 CLOSE_WINDOW_MENU_ID => {
-                    // close() runs the page's autosave close guard.
+                    // Settings always closes; the last document window stays,
+                    // so ⌘W never leaves the app without a window. close()
+                    // runs the page's autosave close guard.
                     if let Some(window) = focused {
-                        let _ = window.close();
+                        let documents = app
+                            .webview_windows()
+                            .keys()
+                            .filter(|label| label.as_str() != SETTINGS_WINDOW)
+                            .count();
+                        if window.label() == SETTINGS_WINDOW || documents > 1 {
+                            let _ = window.close();
+                        }
                     }
                 }
                 _ => {}

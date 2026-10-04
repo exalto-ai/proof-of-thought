@@ -54,8 +54,8 @@ document, ⇧⌘N to open the current one in another window, ⌘O to import a Ma
 Markdown copy of the visible document. New and imported documents open in the current window,
 like switching to one; the documents sidebar lists them all. Saving is silent; the toolbar speaks up only when
 edits are not reaching SQLite (Offline or Save failed).
-⇧⌘W (File → Close Window) closes the window without prompting because Proof of Thought's CRDT
-store remains authoritative; ⌘W and ⌘T do nothing, since notes are not tabs. Export is an explicit one-time action and never establishes a mirrored file.
+⌘W closes a window without prompting because Proof of Thought's CRDT store remains
+authoritative, but never the last document window; ⌘T does nothing, since notes are not tabs. Export is an explicit one-time action and never establishes a mirrored file.
 
 The daemon can also be run on its own:
 
