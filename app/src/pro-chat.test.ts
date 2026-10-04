@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProChatBridge, SendChatRequest } from "./pro-chat-bridge";
-import { installProChat, type ProChatDocument } from "./pro-chat";
+import { chatStats, installProChat, type ProChatDocument } from "./pro-chat";
 
 type ChatOptions = NonNullable<Parameters<typeof installProChat>[1]>;
 type ChatStorage = NonNullable<ChatOptions["storage"]>;
@@ -344,6 +344,35 @@ describe("built-in chat", () => {
     await vi.waitFor(() => expect(pending()).toBeNull());
     expect(document.querySelector('#pro-chat-messages li[data-role="assistant"]')?.textContent)
       .toContain("Tightening it.");
+    controller.destroy();
+  });
+
+  it("records how long each reply took, for the note's stats", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    const bridge = chatBridge({
+      send: vi.fn().mockImplementation(async () => {
+        now.mockReturnValue(4_500);
+        return {
+          text: "Done.",
+          edits: [],
+          provider: "openai",
+          requested_model: "gpt-test",
+          reported_model: null,
+          wording_revision: "revision-1",
+          complete: true,
+        };
+      }),
+    });
+    const controller = installChat({ bridge });
+    controller.setActive(true);
+    controller.setDocument(chatDocument());
+    expect(chatStats(storage, "private-document-id")).toEqual({ replies: 0, elapsedMs: 0 });
+    await chooseOpenAi(bridge);
+    compose("Tighten it");
+    submitChat();
+    await vi.waitFor(() =>
+      expect(chatStats(storage, "private-document-id")).toEqual({ replies: 1, elapsedMs: 3_500 }));
+    now.mockRestore();
     controller.destroy();
   });
 

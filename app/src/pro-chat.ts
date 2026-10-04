@@ -104,6 +104,8 @@ type LocalMessage = ChatMessage & {
   attachments?: AttachmentSummary[];
   suggestionRequestId?: string;
   changes?: ChangeSummary[];
+  /** How long the reply took, from Send to the last edit landing. */
+  elapsedMs?: number;
 };
 
 type PersistedResponse = Omit<SendChatResponse, "text" | "edits">;
@@ -114,6 +116,7 @@ type PersistedMessage = ChatMessage & {
   attachments?: AttachmentSummary[];
   suggestionRequestId?: string;
   changes?: ChangeSummary[];
+  elapsedMs?: number;
 };
 
 type PersistedConversation = {
@@ -330,6 +333,11 @@ function localMessage(value: unknown): LocalMessage | null {
   // Written by the old Add to Note button; nothing reads it now.
   if (value.suggested !== undefined && value.suggested !== true) return null;
   if (value.changes !== undefined && !Array.isArray(value.changes)) return null;
+  if (
+    value.elapsedMs !== undefined &&
+    (typeof value.elapsedMs !== "number" || !Number.isSafeInteger(value.elapsedMs) ||
+      value.elapsedMs < 0 || value.role !== "assistant")
+  ) return null;
   const changes = Array.isArray(value.changes) ? value.changes.map(changeSummary) : [];
   if (changes.length > MAX_CHANGES || changes.some((change) => change === null)) return null;
   if (value.attachments !== undefined && !Array.isArray(value.attachments)) return null;
@@ -372,6 +380,7 @@ function localMessage(value: unknown): LocalMessage | null {
     attachments: attachmentValues.length > 0 ? attachmentValues : undefined,
     suggestionRequestId,
     changes: changes.length > 0 ? changes as ChangeSummary[] : undefined,
+    elapsedMs: typeof value.elapsedMs === "number" ? value.elapsedMs : undefined,
     meta: savedResponse
       ? [PROVIDER_NAMES[savedResponse.provider], reportedModel, thinkingCopy]
         .filter(Boolean).join(" · ")
@@ -424,11 +433,29 @@ function persistedMessage(message: LocalMessage): PersistedMessage {
   }
   if (message.suggestionRequestId) saved.suggestionRequestId = message.suggestionRequestId;
   if (message.changes?.length) saved.changes = message.changes.map((change) => ({ ...change }));
+  if (message.elapsedMs !== undefined) saved.elapsedMs = message.elapsedMs;
   return saved;
 }
 
 function storageKey(documentId: string): string {
   return `${STORAGE_PREFIX}${encodeURIComponent(documentId)}`;
+}
+
+export type ChatStats = { replies: number; elapsedMs: number };
+
+/** How many replies a note's saved chat holds, and how long they took. */
+export function chatStats(storage: Pick<Storage, "getItem"> | null, documentId: string): ChatStats {
+  try {
+    const raw = storage?.getItem(storageKey(documentId));
+    const saved = raw ? persistedConversation(JSON.parse(raw)) : null;
+    const replies = saved?.messages.filter(({ role }) => role === "assistant") ?? [];
+    return {
+      replies: replies.length,
+      elapsedMs: replies.reduce((sum, { elapsedMs }) => sum + (elapsedMs ?? 0), 0),
+    };
+  } catch {
+    return { replies: 0, elapsedMs: 0 };
+  }
 }
 
 function attachmentMediaType(
@@ -1066,6 +1093,7 @@ export function installProChat(
     }));
     pendingText = message;
     pendingReply = { text: "", edits: [], applying: false };
+    const startedAt = Date.now();
     input.value = "";
     setError(null);
     render();
@@ -1139,6 +1167,7 @@ export function installProChat(
           thinking: selectedThinking,
           suggestionRequestId,
           changes: changes.length > 0 ? changes : undefined,
+          elapsedMs: Math.max(0, Date.now() - startedAt),
         },
       );
       clearAttachments();
