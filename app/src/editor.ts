@@ -2,7 +2,7 @@
  * The editor: TipTap over the shared Y.Doc, with the composition guard wired
  * to the provider.
  */
-import { Editor, Extension, getChangedRanges } from "@tiptap/core";
+import { Editor, Extension, getChangedRanges, type JSONContent } from "@tiptap/core";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import type { Awareness } from "y-protocols/awareness";
@@ -92,6 +92,19 @@ export function installEditorCanvasFocus(editor: Editor, element: HTMLElement): 
 
   canvas.addEventListener("mousedown", focusAtEnd);
   return () => canvas.removeEventListener("mousedown", focusAtEnd);
+}
+
+/**
+ * The editor's tree as plain JSON, safe to send to the native side or the
+ * daemon. Older daemons stored integer attributes (a heading's level) as
+ * 64-bit integers, which Yjs hands over as BigInt and `JSON.stringify`
+ * refuses; those become ordinary numbers here.
+ */
+export function editorSnapshot(editor: Editor): JSONContent {
+  return JSON.parse(
+    JSON.stringify(editor.getJSON(), (_key, value: unknown) =>
+      typeof value === "bigint" ? Number(value) : value),
+  ) as JSONContent;
 }
 
 export function createEditor(

@@ -1,8 +1,9 @@
-import type { Editor } from "@tiptap/core";
+import { Editor } from "@tiptap/core";
 import { Schema } from "@tiptap/pm/model";
 import { Transform } from "@tiptap/pm/transform";
 import { describe, expect, it, vi } from "vitest";
-import { installEditorCanvasFocus, transactionRanges } from "./editor";
+import { editorSnapshot, installEditorCanvasFocus, transactionRanges } from "./editor";
+import { extensions } from "./schema";
 
 const schema = new Schema({
   nodes: {
@@ -61,5 +62,17 @@ describe("editor canvas focus", () => {
 
     destroy();
     page.remove();
+  });
+});
+
+describe("editor snapshots", () => {
+  it("turns BigInt attributes from older daemons into plain numbers", () => {
+    const editor = new Editor({ extensions, content: "<h2>Title</h2>" });
+    const heading = editor.state.doc.firstChild!;
+    // As Yjs delivers a 64-bit integer stored by an older daemon.
+    (heading.attrs as Record<string, unknown>).level = BigInt(2);
+    expect(() => JSON.stringify(editor.getJSON())).toThrow();
+    expect(editorSnapshot(editor).content?.[0]?.attrs?.level).toBe(2);
+    editor.destroy();
   });
 });

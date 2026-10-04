@@ -11,7 +11,7 @@ import type { Editor } from "@tiptap/core";
 import { installAiSupport } from "./ai-support";
 import { installDocumentSidebar } from "./doc-sidebar";
 import { ICONS, icon } from "./icons";
-import { createEditor } from "./editor";
+import { createEditor, editorSnapshot } from "./editor";
 import { EditorApi } from "./editor-api";
 import { installCurrentSources } from "./current-sources";
 import {
@@ -131,7 +131,7 @@ async function visibleWordingRevision(): Promise<string | null> {
     return null;
   }
   const revision = await invoke<string>("document_wording_revision", {
-    document: current.editor.getJSON(),
+    document: editorSnapshot(current.editor),
   });
   if (
     open !== current ||
@@ -228,7 +228,7 @@ function refreshTitle(editor: Editor) {
     aiSupport.setCurrentDocument({
       id: openDocId,
       title,
-      snapshot: () => editor.getJSON(),
+      snapshot: () => editorSnapshot(editor),
       blockIds: () => topLevelBlockIds(editor, current.doc),
       waitUntilSaved: () => current.provider.waitUntilSaved(),
       selectedText: () => {
@@ -706,7 +706,7 @@ async function exportMarkdownFile(target = open): Promise<boolean> {
     // also keeps the native file command independent from daemon transport.
     const exported = await exportMarkdownDocument(
       nativeFileBridge,
-      target.editor.getJSON(),
+      editorSnapshot(target.editor),
       deriveTitle(target.editor),
     );
     if (!exported) return false;
