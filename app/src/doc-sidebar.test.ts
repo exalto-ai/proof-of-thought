@@ -95,6 +95,31 @@ describe("document sidebar", () => {
     controller.destroy();
   });
 
+  it("asks for a menu on right-click and rings that row while it is open", async () => {
+    let close!: () => void;
+    const showMenu = vi.fn(() => new Promise<void>((resolve) => (close = resolve)));
+    const controller = installDocumentSidebar(document, {
+      storage: memoryStorage(),
+      list: vi.fn().mockResolvedValue([doc("a", NOW, "Plan")]),
+      search: vi.fn(),
+      open: vi.fn(),
+      create: vi.fn(),
+      showMenu,
+      now: () => NOW,
+    });
+    await controller.refresh();
+    const row = document.querySelector<HTMLButtonElement>(".doc-row")!;
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    row.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(showMenu).toHaveBeenCalledWith({ doc_id: "a", title: "Plan" });
+    expect(row.classList.contains("is-menu-target")).toBe(true);
+    close();
+    await vi.waitFor(() => expect(row.classList.contains("is-menu-target")).toBe(false));
+    controller.destroy();
+  });
+
   it("filters through search and opens the first result on Enter", async () => {
     vi.useFakeTimers();
     const { controller, open, search } = install([doc("a", NOW, "Plan")]);

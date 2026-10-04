@@ -19,6 +19,8 @@ type Options = {
   search(query: string): Promise<Array<{ doc_id: string; title: string }>>;
   open(docId: string): unknown;
   create(): unknown;
+  /** Show a menu for a row; resolves when the menu closes. */
+  showMenu?(document: { doc_id: string; title: string }): Promise<unknown>;
   onNotice?: (message: string, kind?: "info" | "error") => void;
   now?: () => number;
 };
@@ -210,6 +212,18 @@ export function installDocumentSidebar(
   listen(list, "click", (event) => {
     const button = (event.target as Element).closest<HTMLButtonElement>(".doc-row");
     if (button?.dataset.docId) void options.open(button.dataset.docId);
+  });
+  listen(list, "contextmenu", (event) => {
+    const button = (event.target as Element).closest<HTMLButtonElement>(".doc-row");
+    const docId = button?.dataset.docId;
+    if (!button || !docId || !options.showMenu) return;
+    event.preventDefault();
+    // Ring the row the menu is about, as Finder and Notes do.
+    button.classList.add("is-menu-target");
+    const title = button.querySelector(".doc-row-title")?.textContent ?? "";
+    void Promise.resolve(options.showMenu({ doc_id: docId, title }))
+      .catch(() => undefined)
+      .finally(() => button.classList.remove("is-menu-target"));
   });
   listen(list, "keydown", (event) => {
     const key = (event as KeyboardEvent).key;

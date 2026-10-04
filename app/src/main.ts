@@ -3,6 +3,7 @@
  * platform accelerator and K.
  */
 import { invoke } from "@tauri-apps/api/core";
+import { Menu } from "@tauri-apps/api/menu";
 import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import type { Editor } from "@tiptap/core";
@@ -103,6 +104,8 @@ const docSidebar = installDocumentSidebar(document, {
   search: async (query) => (mcp ? mcp.search(query) : []),
   open: (docId) => openDocument(docId),
   create: () => createNewDocument(),
+  // Native menus exist only in the app; the browser keeps its own.
+  showMenu: isTauri() ? showDocumentMenu : undefined,
   onNotice: notify,
 });
 
@@ -638,6 +641,57 @@ async function toggleTrashMode() {
 }
 
 /**
+ * Move one document to the trash. Soft: the document and its history remain,
+ * and the tombstone replicates. If this window was showing it, move on to the
+ * most recent remaining document rather than stare at a trashed one.
+ */
+async function trashDocument(row: { doc_id: string; title: string }): Promise<boolean> {
+  const wasOpen = row.doc_id === openDocId;
+  if (wasOpen && !(await canLeaveCurrentDocument())) return false;
+  try {
+    await editorApi.setDocumentDeleted(row.doc_id, true);
+    notify(`Moved "${row.title || "Untitled"}" to the trash · ${ACCEL_LABEL}⇧⌫ to find it`);
+    void docSidebar.refresh();
+  } catch (error) {
+    notify(`Could not trash: ${reason(error)}`, "error");
+    return false;
+  }
+  if (wasOpen) {
+    const next = (await mcp.listDocuments())[0];
+    if (next) {
+      closeSwitcher();
+      await openDocument(next.doc_id);
+    }
+  }
+  return true;
+}
+
+async function openInNewWindow(docId: string) {
+  try {
+    await invoke("new_window", { docId });
+  } catch (error) {
+    notify(`Could not open a new window: ${reason(error)}`, "error");
+  }
+}
+
+/** The native context menu for a document in the sidebar. */
+async function showDocumentMenu(row: { doc_id: string; title: string }) {
+  const menu = await Menu.new({
+    items: [
+      { id: "open", text: "Open", action: () => void openDocument(row.doc_id) },
+      {
+        id: "open-window",
+        text: "Open in New Window",
+        action: () => void openInNewWindow(row.doc_id),
+      },
+      { item: "Separator" },
+      { id: "trash", text: "Move to Trash", action: () => void trashDocument(row) },
+    ],
+  });
+  await menu.popup();
+}
+
+/**
  * Trash the highlighted document. Soft: the document and its history remain,
  * and the tombstone replicates, so this is undoable by anyone with the id.
  */
@@ -658,26 +712,7 @@ async function trashSelected() {
     return;
   }
 
-  const wasOpen = row.doc_id === openDocId;
-  if (wasOpen && !(await canLeaveCurrentDocument())) return;
-  try {
-    await editorApi.setDocumentDeleted(row.doc_id, true);
-    notify(`Moved "${row.title || "Untitled"}" to the trash · ${ACCEL_LABEL}⇧⌫ to find it`);
-    void docSidebar.refresh();
-  } catch (error) {
-    notify(`Could not trash: ${reason(error)}`, "error");
-    return;
-  }
-  await refreshResults();
-
-  // Do not leave the window staring at something that is no longer listed.
-  if (wasOpen) {
-    const next = results[0] ?? (await mcp.listDocuments())[0];
-    if (next) {
-      closeSwitcher();
-      await openDocument(next.doc_id);
-    }
-  }
+  if (await trashDocument(row)) await refreshResults();
 }
 
 /** Create a document and show it in this window, as Notes does. */
