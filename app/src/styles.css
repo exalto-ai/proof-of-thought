@@ -1157,8 +1157,11 @@ body.settings-page {
   letter-spacing: -0.003em;
   zoom: var(--editor-zoom, 1);
 }
+/* Drop the browser's paragraph margins without outranking the block rhythm
+   below. As `.tiptap p` this reset was more specific than `> * + *`, so
+   paragraphs ran together with no space between them. */
+.tiptap :where(p) { margin: 0; }
 .tiptap > * + * { margin-top: 0.85em; }
-.tiptap p { margin: 0; }
 .tiptap p:empty::after { content: ""; display: inline-block; }
 
 .tiptap h1, .tiptap h2, .tiptap h3 {
