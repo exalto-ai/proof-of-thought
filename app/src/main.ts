@@ -198,6 +198,12 @@ function deriveTitle(editor: Editor): string {
 }
 
 function refreshTitle(editor: Editor) {
+  // Until the daemon delivers the document, the editor is empty, and a title
+  // derived from it would flash "Untitled" in the window and the sidebar.
+  if (open?.editor === editor && !open.provider.isHydrated) {
+    if (openDocId) docSidebar.setCurrent(openDocId);
+    return;
+  }
   const title = deriveTitle(editor);
   document.title = title;
   void nativeWindow()?.setTitle(title);
@@ -387,7 +393,9 @@ async function openDocument(docId: string): Promise<boolean> {
   editor.on("update", scheduleProvenance);
   editor.on("update", currentSources.scheduleRefresh);
   const stopSourceHydration = provider.subscribeHydration((hydrated) => {
-    if (hydrated) currentSources.scheduleRefresh();
+    if (!hydrated) return;
+    refreshTitle(editor);
+    currentSources.scheduleRefresh();
   });
   const stopSourceSaveStatus = provider.subscribeSaveStatus((status) => {
     if (status === "saved") {
