@@ -79,6 +79,7 @@
               <ul id="pro-chat-attachments" hidden></ul>
               <textarea id="pro-chat-input" maxlength="16384" rows="2" placeholder="Ask about this note…"></textarea>
               <div class="pro-chat-composer-bar">
+                <span class="chatgpt-indicator" id="pro-chat-plan" role="img" aria-label="Using ChatGPT plan" title="Using ChatGPT plan" hidden><span class="chatgpt-logo" aria-hidden="true"></span></span>
                 <label class="pro-chat-picker"><span class="sr-only">Model</span>
                   <select id="pro-chat-model" aria-label="Model" disabled></select>
                 </label>
@@ -91,13 +92,11 @@
                   </select>
                 </label>
                 <span class="pro-chat-spacer"></span>
-                <button class="icon-action" id="pro-chat-attach" type="button" title="Attach files — up to 5, 20 MiB total. File contents are not saved." aria-label="Attach files" data-icon="paperclip"></button>
+                <button class="icon-action" id="pro-chat-attach" type="button" title="Attach files" aria-label="Attach files" data-icon="paperclip"></button>
                 <input id="pro-chat-attachment-input" type="file" accept="application/pdf,text/*,.pdf,.txt,.md,.markdown,.csv,.json,.html,.htm,.log,.xml,.yaml,.yml,.toml" multiple hidden />
                 <button class="pro-chat-send" id="pro-chat-send" type="submit" title="Send" aria-label="Send" data-icon="arrowUp" disabled></button>
               </div>
             </div>
-            <p class="chatgpt-indicator" id="pro-chat-plan" hidden><span class="chatgpt-logo" aria-hidden="true"></span>Using ChatGPT plan</p>
-            <p class="pro-chat-disclosure">Sends this note, the chat, and attached files to the selected provider.</p>
           </form>
         </section>
 
@@ -109,7 +108,7 @@
           <p id="current-source-status" aria-live="polite">Open a document to see its sources.</p>
           <button class="text-button" id="current-source-retry" type="button" hidden>Try again</button>
           <ul id="current-source-list" hidden></ul>
-          <p class="ai-sidebar-note" id="current-source-note" hidden>These labels describe how surviving text entered this document. They do not prove who composed pasted, imported, or tool-reported text.</p>
+          <p class="ai-sidebar-note" id="current-source-note" hidden>How text entered this note, not proof of who wrote it.</p>
         </section>
         </div>
       </aside>

@@ -624,14 +624,6 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pro-chat .chatgpt-indicator { margin: 0; padding-inline: 4px; }
-.pro-chat-disclosure {
-  margin: 0;
-  padding-inline: 4px;
-  color: var(--ink-faint);
-  font-size: 10.5px;
-  line-height: 1.4;
-}
 
 /* Agent and Proof: one pane at a time, under a segmented control in its own
    row below the title bar, so it has room to breathe. */
@@ -723,13 +715,13 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 }
 .settings button.chatgpt-button:hover:not(:disabled) { background: #222; }
 .settings button.chatgpt-button[hidden] { display: none; }
+/* "Using ChatGPT plan", as OpenAI asks: the logo beside the model menu. */
 .chatgpt-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: -4px 0 10px;
-  color: var(--ink-faint);
-  font-size: 11.5px;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 24px;
+  color: var(--ink-soft);
 }
 .chatgpt-indicator[hidden] { display: none; }
 .chatgpt-indicator .chatgpt-logo { width: 12px; height: 12px; }

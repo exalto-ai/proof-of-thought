@@ -6,13 +6,12 @@ const settings = readFileSync(resolve(import.meta.dirname, "../settings.html"), 
 const window = readFileSync(resolve(import.meta.dirname, "../index.html"), "utf8");
 
 describe("AI settings copy", () => {
-  it("makes review, cost, and assurance differences explicit", () => {
-    expect(settings).toContain("Accept and Reject");
-    expect(settings).toContain("no separate API charge");
-    expect(settings).toContain("Provider API charges apply");
-    expect(settings).toContain("reported by the connected tool");
-    expect(settings).toContain("Accepted wording is still labeled as reported AI output");
+  it("keeps the few statements that are not self-evident", () => {
+    // Attribution is reported, never verified (AD-6, AD-21).
+    expect(settings).toContain("as the app reports them");
+    expect(settings).toContain("may send note text to its own provider");
     expect(settings).toContain("login Keychain");
+    expect(settings).toContain("Provider API charges apply");
   });
 
   it("offers the four supported local setup paths", () => {
@@ -25,6 +24,6 @@ describe("AI settings copy", () => {
   it("keeps configuration out of the document window", () => {
     expect(window).not.toContain('id="provider-settings"');
     expect(window).not.toContain('id="reviewer-form"');
-    expect(window).toContain("Sends this note");
+    expect(window).toContain('aria-label="Using ChatGPT plan"');
   });
 });
