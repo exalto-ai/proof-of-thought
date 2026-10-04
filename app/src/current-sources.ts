@@ -1,4 +1,5 @@
 import type { DocumentLineage } from "./mcp";
+import { oneLine } from "./notices";
 
 export type CurrentSources = {
   setDocument(docId: string | null): void;
@@ -79,9 +80,9 @@ export function installCurrentSources(
         return;
       }
       render(lineage);
-    } catch {
+    } catch (error) {
       if (currentRequest !== request || target !== docId) return;
-      status.textContent = "Could not load sources.";
+      status.textContent = `Could not load sources: ${oneLine(error, "unknown error", 160)}`;
       retry.hidden = false;
     }
   }

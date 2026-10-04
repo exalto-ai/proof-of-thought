@@ -53,6 +53,18 @@ describe("current sources", () => {
     expect(text).not.toContain("%");
   });
 
+  it("says why sources could not load", async () => {
+    const load = vi.fn(async () => {
+      throw new Error("MCP request failed (500)");
+    });
+    const view = installCurrentSources(document, load, async () => "revision-a");
+    view.setDocument("doc-a");
+    await vi.waitFor(() => expect(document.querySelector("#current-source-status")?.textContent)
+      .toBe("Could not load sources: MCP request failed (500)"));
+    expect(document.querySelector<HTMLElement>("#current-source-retry")!.hidden).toBe(false);
+    view.destroy();
+  });
+
   it("ignores a response for a document that is no longer open", async () => {
     let finishFirst!: (value: DocumentLineage) => void;
     const first = new Promise<DocumentLineage>((resolve) => {
