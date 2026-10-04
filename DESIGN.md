@@ -11,6 +11,7 @@ document or it does not belong in the app.
 | Token | Value | Use |
 | --- | --- | --- |
 | Ground | `#1e1e1f` | Window and editor in the dark appearance |
+| Sidebars | `#232324` | Both sidebars' ground in the dark appearance |
 | Icon tile | `#0c1622` | App-icon ground (`assets/icon-manifest.json`) only |
 | Accent | `#6ea1ff` | Caret, focus, active formatting, links |
 | Positive | `#76c392` | Connected, saved, available, and Verified state |
@@ -35,7 +36,8 @@ ground. The app icon keeps its deep-blue tile in both.
 
 | Token | Value |
 | --- | --- |
-| Ground | `#f7f9fc` |
+| Ground (editor) | `#ffffff` |
+| Sidebars and Settings | `#f5f5f7` |
 | Accent | `#2a66d9` |
 | Positive / text | `#2f8a57` / `#236b43` |
 | Caution / text | `#b57d12` / `#845906` |
