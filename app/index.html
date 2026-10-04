@@ -21,13 +21,13 @@
     <div class="workspace">
       <aside class="side-panel doc-sidebar" id="doc-sidebar" data-side-panel aria-label="Documents" tabindex="-1" hidden>
         <div class="titlebar" data-tauri-drag-region></div>
-        <div class="doc-sidebar-header">
-          <button class="new-note" id="doc-new" type="button" title="New Note (⌘N)">New Note</button>
-        </div>
         <nav class="doc-list" id="doc-list" aria-label="Documents"></nav>
         <div class="empty-state" id="doc-list-empty" hidden>
           <p class="empty-state-title" id="doc-list-empty-title"></p>
           <button class="empty-state-action" id="doc-list-empty-new" type="button">New Note</button>
+        </div>
+        <div class="doc-sidebar-footer">
+          <button class="footer-add" id="doc-new" type="button" aria-label="New Note" title="New Note (⌘N)"></button>
         </div>
       </aside>
       <div class="side-panel-resizer" id="doc-sidebar-resizer" role="separator" aria-orientation="vertical" aria-controls="doc-sidebar" aria-label="Resize documents sidebar" tabindex="0" hidden></div>

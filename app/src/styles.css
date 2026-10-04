@@ -310,36 +310,34 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .side-panel:focus { outline: none; }
 
 /* ---------- documents sidebar ---------- */
-.doc-sidebar-header {
+/* New Note: a plain + in the sidebar's footer, on the sidebar's own ground,
+   as add buttons sit at the foot of Finder and Notes sidebars. */
+.doc-sidebar-footer {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px 6px;
+  padding: 4px 8px 8px;
 }
-/* + New Note: a full-width row at the top of the list. */
-.new-note {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--rule);
-  border-radius: 7px;
-  background: var(--raised);
-  color: var(--ink);
-  font: 500 13px var(--sans);
+.footer-add {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
   cursor: default;
 }
-.new-note:hover { background: color-mix(in srgb, var(--ink) 6%, var(--raised)); }
-.new-note:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.new-note svg {
-  width: 14px;
-  height: 14px;
+.footer-add:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); }
+.footer-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.footer-add svg {
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 1.8;
   stroke-linecap: round;
 }
 .doc-list[hidden] { display: none; }

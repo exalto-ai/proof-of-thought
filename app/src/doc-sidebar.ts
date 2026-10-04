@@ -100,7 +100,7 @@ export function installDocumentSidebar(
   let renderTimer: number | null = null;
   let refreshTimer: number | null = null;
 
-  create.prepend(icon(ICONS.plus));
+  create.replaceChildren(icon(ICONS.plus));
 
   const panel = installSidePanel(root, {
     storage: options.storage,

@@ -952,7 +952,7 @@ its own title-bar strip, and the two sidebar toggles stay pinned beside the wind
 the top-right corner whether or not their sidebars show.
 
 A matching left sidebar lists every document, newest first, grouped by recency (Today,
-Yesterday, Previous 7 and 30 Days, then by month and year), under a full-width New Note button.
+Yesterday, Previous 7 and 30 Days, then by month and year), with a plain + for New Note in its footer.
 A search icon pinned beside its toggle opens the ⌘K switcher, the one search. Documents are a flat set named by their own first line, so this is a list,
 not a tree. Clicking a row opens it in this window like the ⌘K switcher, and so does New. Order comes from the daemon's `updated_at`, re-read on focus and after a local
 save, so opening a document never makes it look recently edited.
