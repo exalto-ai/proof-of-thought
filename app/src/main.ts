@@ -32,7 +32,7 @@ import {
   type SuggestionReviewController,
 } from "./suggestions";
 import { installToast, oneLine } from "./notices";
-import { hasNativeSidebarMaterial, isTauri, nativeWindow } from "./tauri";
+import { isTauri, nativeWindow } from "./tauri";
 
 type Connection = {
   sync_url: string;
@@ -83,7 +83,6 @@ const notify = installToast(els.toast);
 const reason = (error: unknown) => oneLine(error, "unknown error", 160);
 
 installTheme(safeLocalStorage(), nativeWindow());
-document.documentElement.classList.toggle("native-material", hasNativeSidebarMaterial());
 installToolbarPosition(safeLocalStorage());
 
 const aiSupport = installAiSupport(document, {

@@ -947,15 +947,6 @@ save, so opening a document never makes it look recently edited.
 editor width that neither drag can take. The daemon pushes no list changes, so another window's
 new document appears when this window regains focus rather than immediately.
 
-On macOS, document windows are transparent over the system sidebar material, so the title
-strip and both sidebars show the same translucent, desktop-tinted surface as Notes or Finder and
-follow the window's light, dark, and active state natively. The writing surface keeps its own
-opaque ground. Settings stays opaque, as System Settings does.
-
-**Cost:** transparent windows need Tauri's `macos-private-api` feature. Developer ID
-distribution with notarization accepts it; the Mac App Store does not, so shipping there would
-mean dropping the material or replacing it.
-
 Configuration lives in one app-wide Settings window (Proof of Thought → Settings…, ⌘,):
 appearance, provider keys for built-in chat, and connected apps. The sidebar only asks whether a
 provider key exists; with none it points to Settings, and with exactly one it selects that
