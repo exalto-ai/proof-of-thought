@@ -30,6 +30,7 @@ import { readItem, safeLocalStorage, safeSessionStorage, writeItem } from "./sto
 import { installTheme } from "./theme";
 import { ZOOM_COMMAND_EVENT, type ZoomCommand } from "./toolbar";
 import { installToolbarPosition } from "./toolbar-position";
+import { installRailPosition } from "./rail-position";
 import {
   installSuggestionReview,
   topLevelBlockIds,
@@ -85,6 +86,7 @@ const reason = (error: unknown) => oneLine(error, "unknown error", 160);
 
 installTheme(safeLocalStorage(), nativeAppearance());
 installToolbarPosition(safeLocalStorage());
+installRailPosition(safeLocalStorage());
 
 const aiSupport = installAiSupport(document, {
   providerBridge: isTauri() ? tauriProProviderBridge() : null,

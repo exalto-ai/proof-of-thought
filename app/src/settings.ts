@@ -34,6 +34,12 @@ import {
   writeToolbarPosition,
   type ToolbarPosition,
 } from "./toolbar-position";
+import {
+  isRailPosition,
+  readRailPosition,
+  writeRailPosition,
+  type RailPosition,
+} from "./rail-position";
 import { required } from "./dom";
 import { installToast, oneLine } from "./notices";
 import { isTauri, nativeAppearance } from "./tauri";
@@ -157,6 +163,17 @@ installChoice<ToolbarPosition>(
   (position) => {
     if (!writeToolbarPosition(storage, position)) {
       notify("Could not save the toolbar position.", "error");
+    }
+  },
+);
+
+installChoice<RailPosition>(
+  "data-rails-choice",
+  isRailPosition,
+  () => readRailPosition(storage),
+  (position) => {
+    if (!writeRailPosition(storage, position)) {
+      notify("Could not save where the attribution rails go.", "error");
     }
   },
 );

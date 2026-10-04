@@ -1101,11 +1101,23 @@ body.settings-page {
 }
 .rail-label[hidden] { display: none; }
 
+/* Settings → Attribution: the right margin, mirrored, or no rails at all. */
+:root[data-rails="right"] .rail { left: auto; right: -30px; }
+:root[data-rails="right"] .rail::before { right: auto; left: 0; }
+:root[data-rails="right"] .rail-label { left: auto; right: -24px; }
+:root[data-rails="off"] .rails { display: none; }
+
 /* Below this the measure fills the window and there is no margin left to draw
-   in, so the rails move inside the editor's own padding. */
+   in, so the rails move to the edge of the editor's own padding, as far from
+   the text as it allows. */
 @container (max-width: 860px) {
-  .rail { left: 2px; }
+  .rail { left: -10px; }
   .rail-label { left: 18px; }
+  /* Inside the page's right edge, which scrolls rather than clips, with
+     the bar on the outer side so it stays clear of the text. */
+  :root[data-rails="right"] .rail { left: auto; right: 0; }
+  :root[data-rails="right"] .rail::before { left: auto; right: 0; }
+  :root[data-rails="right"] .rail-label { left: auto; right: 18px; }
 }
 /* Narrower still and a rail would sit on top of the text it describes. */
 @container (max-width: 600px) {
