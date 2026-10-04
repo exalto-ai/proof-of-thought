@@ -49,13 +49,13 @@ for how one is built and signed.
 npm run tauri dev --prefix app
 ```
 
-The app starts the daemon itself. Press ⌘F to find in the document, ⌘K to switch documents, ⌘T to create a blank
-document, ⌘N to open the current one in another window, ⌘O to import a Markdown snapshot as a new document, and ⌘S to export a one-time
+The app starts the daemon itself. Press ⌘F to find in the document, ⌘K to switch documents, ⌘N to create a blank
+document, ⇧⌘N to open the current one in another window, ⌘O to import a Markdown snapshot as a new document, and ⌘S to export a one-time
 Markdown copy of the visible document. New and imported documents open in the current window,
 like switching to one; the documents sidebar lists them all. Saving is silent; the toolbar speaks up only when
 edits are not reaching SQLite (Offline or Save failed).
-⌘W closes the window without prompting because Proof of Thought's CRDT store remains
-authoritative. Export is an explicit one-time action and never establishes a mirrored file.
+⇧⌘W (File → Close Window) closes the window without prompting because Proof of Thought's CRDT
+store remains authoritative; ⌘W and ⌘T do nothing, since notes are not tabs. Export is an explicit one-time action and never establishes a mirrored file.
 
 The daemon can also be run on its own:
 

@@ -4,6 +4,7 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { Menu } from "@tauri-apps/api/menu";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import type { Editor } from "@tiptap/core";
@@ -688,18 +689,16 @@ async function exportMarkdownFile(target = open): Promise<boolean> {
  */
 // ---------------------------------------------------------------- keys
 
+// File → New Note (⌘N) and New Window (⇧⌘N) are native menu items; the menu
+// hands them to the focused window, which knows which note it shows.
+if (isTauri()) {
+  void getCurrentWebviewWindow().listen<string>("menu-action", ({ payload }) => {
+    if (payload === "new-note") void createNewDocument();
+    else if (payload === "new-window" && openDocId) void openInNewWindow(openDocId);
+  });
+}
+
 document.addEventListener("keydown", (event) => {
-  // ⌘T: a new note here, like a new tab. ⌘N: another window on this note.
-  if (accel(event) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "t") {
-    event.preventDefault();
-    void createNewDocument();
-    return;
-  }
-  if (accel(event) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "n") {
-    event.preventDefault();
-    if (openDocId) void openInNewWindow(openDocId);
-    return;
-  }
   if (
     accel(event) &&
     !event.shiftKey &&

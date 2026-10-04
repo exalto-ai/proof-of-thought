@@ -356,6 +356,11 @@ fn cascaded_position(
 
 const SETTINGS_WINDOW: &str = "settings";
 const SETTINGS_MENU_ID: &str = "settings";
+const NEW_NOTE_MENU_ID: &str = "new-note";
+const NEW_WINDOW_MENU_ID: &str = "new-window";
+const CLOSE_WINDOW_MENU_ID: &str = "close-window";
+/// File-menu commands the focused document window carries out itself.
+const MENU_ACTION_EVENT: &str = "menu-action";
 
 /// Show the one app-wide Settings window, creating it on first use.
 ///
@@ -386,6 +391,45 @@ fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
 fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
     use tauri::menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
     let menu = Menu::default(app)?;
+    // Notes are not tabs, and a stray ⌘W used to close the whole window: drop
+    // the default ⌘W Close Window items and offer Close Window on ⇧⌘W instead.
+    for item in menu.items()? {
+        if let MenuItemKind::Submenu(submenu) = item {
+            for child in submenu.items()? {
+                if let MenuItemKind::Predefined(predefined) = &child
+                    && predefined.text()? == "Close Window"
+                {
+                    submenu.remove(&child)?;
+                }
+            }
+            if submenu.text()? == "File" {
+                let new_note = MenuItem::with_id(
+                    app,
+                    NEW_NOTE_MENU_ID,
+                    "New Note",
+                    true,
+                    Some("CmdOrCtrl+N"),
+                )?;
+                let new_window = MenuItem::with_id(
+                    app,
+                    NEW_WINDOW_MENU_ID,
+                    "New Window",
+                    true,
+                    Some("CmdOrCtrl+Shift+N"),
+                )?;
+                let close_window = MenuItem::with_id(
+                    app,
+                    CLOSE_WINDOW_MENU_ID,
+                    "Close Window",
+                    true,
+                    Some("CmdOrCtrl+Shift+W"),
+                )?;
+                let separator = PredefinedMenuItem::separator(app)?;
+                submenu.insert_items(&[&new_note, &new_window, &separator], 0)?;
+                submenu.append(&close_window)?;
+            }
+        }
+    }
     if let Some(MenuItemKind::Submenu(app_submenu)) = menu.items()?.first() {
         let settings = MenuItem::with_id(
             app,
@@ -807,10 +851,30 @@ pub fn run() {
             let _ = (window, event);
         })
         .on_menu_event(|app, event| {
-            if event.id() == SETTINGS_MENU_ID
-                && let Err(error) = open_settings(app.clone())
-            {
-                eprintln!("could not open Settings: {error}");
+            use tauri::{Emitter as _, Manager as _};
+            let focused = app
+                .webview_windows()
+                .into_values()
+                .find(|window| window.is_focused().unwrap_or(false));
+            match event.id().as_ref() {
+                SETTINGS_MENU_ID => {
+                    if let Err(error) = open_settings(app.clone()) {
+                        eprintln!("could not open Settings: {error}");
+                    }
+                }
+                id @ (NEW_NOTE_MENU_ID | NEW_WINDOW_MENU_ID) => {
+                    // The window knows which note it shows; Settings ignores these.
+                    if let Some(window) = focused {
+                        let _ = app.emit_to(window.label(), MENU_ACTION_EVENT, id);
+                    }
+                }
+                CLOSE_WINDOW_MENU_ID => {
+                    // close() runs the page's autosave close guard.
+                    if let Some(window) = focused {
+                        let _ = window.close();
+                    }
+                }
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![

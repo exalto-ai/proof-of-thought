@@ -973,10 +973,10 @@ app-wide Settings window (Proof of Thought → Settings…, ⌘,) offers Auto (f
 Light, and Dark. A compact, centered toolbar, floating at the top or bottom of the editor as
 Settings chooses, provides New, local zoom, persistent block style, font
 size, bold, italic, and link commands. Clicking linked text opens an action card with
-explicit open, copy, edit, and remove commands instead of navigating immediately. ⌘T,
+explicit open, copy, edit, and remove commands instead of navigating immediately. ⌘N,
 New, and Markdown import create a document and open it in the current window, as Notes does,
 after the same autosave check as switching documents; the documents sidebar lists every
-document, so a new one is never lost behind the current editor. ⌘N opens the current document
+document, so a new one is never lost behind the current editor. ⇧⌘N opens the current document
 in another, visibly cascaded window (macOS may show it as a tab, per the system's "Prefer tabs"
 setting), as does a note's Open in New Window.
 
@@ -990,8 +990,13 @@ counts it showed are no longer in the window; the op log still has them.
 **Amended:** New used to open every document in its own window so it never replaced the
 editor in use. With a documents sidebar that is no longer needed to keep work reachable, and it
 filled the screen with windows. **Cost:** creating a document now leaves the previous one, which
-stays one click away in the sidebar or switcher. ⌘W closes the window;
+stays one click away in the sidebar or switcher. File → Close Window (⇧⌘W) closes the window;
 export remains an explicit action rather than an exit prompt.
+
+**Amended:** briefly, ⌘T made a note and ⌘N a window, which taught browser-tab habits that ⌘W
+then broke by closing the whole window. Notes are not tabs: the File menu now owns New Note
+(⌘N), New Window (⇧⌘N), and Close Window (⇧⌘W), and ⌘T and ⌘W do nothing. **Cost:** ⌘W no
+longer closes windows, which most Mac apps do; the red button and ⇧⌘W still do.
 
 The database and CRDT remain authoritative. Import reads a Markdown snapshot into one new
 document, atomically creating its initial CRDT state. Export projects the current editor
