@@ -672,13 +672,13 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   line-height: 1.4;
 }
 
-/* Agent and Proof: one pane at a time under a segmented control in the
-   title-bar row (the AI toggle is pinned over its right end). */
-.sidebar-titlebar {
+/* Agent and Proof: one pane at a time, under a segmented control in its own
+   row below the title bar, so it has room to breathe. */
+.sidebar-tabs-row {
+  flex: 0 0 auto;
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: 0 44px;
+  padding: 2px 16px 8px;
 }
 .sidebar-tabs {
   display: inline-flex;
