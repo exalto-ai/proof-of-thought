@@ -57,8 +57,7 @@ the editor you are already using, and each new window is visibly cascaded from i
 ⌘W closes the window without prompting because Proof of Thought's CRDT store remains
 authoritative. Export is an explicit one-time action and never establishes a mirrored file.
 
-The daemon can also be run on its own. Add reviewers under Connected apps in Settings (⌘,). Each saved
-connection gets its own read-only credential and current-document or all-document scope:
+The daemon can also be run on its own:
 
 ```bash
 cargo run -p thoughtd
@@ -70,8 +69,9 @@ connection's separate credential from an owner-only file and never prints it. It
 published daemon or starts one when discovery is stale. Process-lifetime locks decide which
 daemon may publish and open SQLite; file presence and PIDs do not.
 
-The sidebar provides setup for ChatGPT desktop, Codex, Claude Desktop, and Claude Code. Connected
-reviewers see only read and suggestion tools. Their last-used time and reported model are status
+Connected apps in Settings (⌘,) sets up ChatGPT desktop, Codex, Claude Desktop, and Claude Code
+as reviewers. Each saved connection gets its own credential, scoped to all documents or to one, and
+sees only read and suggestion tools. Their last-used time and reported model are status
 hints, not verified identity or live presence.
 
 ## Shape

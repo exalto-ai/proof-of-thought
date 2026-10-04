@@ -933,7 +933,7 @@ adjacency is why both belong to the same milestone.
 Each document has its own native window. ⌘K opens a switcher backed by the daemon's FTS index,
 the same `search` the agents use, so there is one search implementation rather than two. A
 right sidebar, open by default and resizable by dragging its border, holds built-in chat and the
-current text's recorded sources. A toolbar toggle is its only show/hide control, and the choice
+current text's recorded sources. A title-bar toggle is its only show/hide control, and the choice
 and width are remembered per machine.
 
 Configuration lives in one app-wide Settings window (Proof of Thought → Settings…, ⌘,):

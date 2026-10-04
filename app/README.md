@@ -1,7 +1,4 @@
-# Tauri + Vanilla TS
+# app
 
-This template should help get you started developing with Tauri in vanilla HTML, CSS and Typescript.
-
-## Recommended IDE Setup
-
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+The Tauri window: TypeScript, TipTap, and Vite. See the [root README](../README.md) to run it
+(`npm run tauri dev --prefix app`) and [`docs/`](../docs/) for how it fits together.
