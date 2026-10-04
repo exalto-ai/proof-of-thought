@@ -113,6 +113,32 @@ html, body {
   text-rendering: optimizeLegibility;
 }
 
+/* Selection follows Mac apps: content selects, interface chrome does not.
+   Labels, headings, buttons, list rows, tabs, and notes are chrome, with the
+   arrow cursor. What someone may want to copy opts back in: the document,
+   fields, chat messages, proposed wording, a link's address, setup commands,
+   and error text worth pasting into a report. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+.tiptap,
+input,
+textarea,
+.pro-chat-messages p,
+.pro-chat-focus span,
+.suggestion-preview,
+.suggestion-explanation,
+.link-card-url,
+.reviewer-setup pre,
+.reviewer-setup-name,
+.reviewer-error,
+.suggestion-error {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 body { display: flex; flex-direction: column; overflow: hidden; }
 
 /* ---------- chrome ---------- */
@@ -121,8 +147,6 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .titlebar {
   flex: 0 0 auto;
   height: var(--chrome-height);
-  -webkit-user-select: none;
-  user-select: none;
 }
 .main-column {
   flex: 1;
