@@ -1013,7 +1013,10 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-width: 61px;
+  /* Fits the widest label ("Connecting…"). The centered toolbar is sized to
+     its content, so a narrower box re-centers the whole bar on every
+     Saving…/Autosaved flip while typing. */
+  min-width: 8.5em;
   padding: 0 6px 0 4px;
   color: var(--ink-faint);
   font: 500 11px/1 var(--sans);
