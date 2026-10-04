@@ -212,7 +212,7 @@ async fn create_chat_suggestion(
     if lineage.current_wording_revision != request.wording_revision {
         return Err((
             StatusCode::CONFLICT,
-            "The document changed after this response was generated.".into(),
+            "The note changed after this reply was written. Ask again to add an up-to-date version.".into(),
         ));
     }
     let current = state.workspace.read_document(&doc_id).map_err(failed)?;

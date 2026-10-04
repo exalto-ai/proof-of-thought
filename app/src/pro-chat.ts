@@ -971,7 +971,7 @@ export function installProChat(
       options.onNotice?.("Suggestion added for review.");
     } catch (cause) {
       if (!destroyed && generation === requestGeneration) {
-        setError(`Could not create suggestion: ${oneLine(cause, "The provider request failed.")}`);
+        setError(`Could not add to the note: ${oneLine(cause, "The provider request failed.")}`);
         options.onNotice?.("Could not create the suggestion.", "error");
       }
     } finally {
