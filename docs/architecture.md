@@ -967,8 +967,8 @@ It is all presentation; the Keychain, the daemon, and the CRDT remain the author
 chooser removes the first-run explanation of the three paths; that copy now lives beside each
 setting it describes.
 
-System sans throughout, sized and spaced for long-form writing. The dark appearance uses the
-deep-blue `#0c1622` ground shared with the app icon; a sibling light palette exists, and one
+System sans throughout, sized and spaced for long-form writing. The dark appearance uses a
+neutral near-black `#1e1e1f` ground; a sibling light palette exists, and one
 app-wide Settings window (Proof of Thought → Settings…, ⌘,) offers Auto (follow the system),
 Light, and Dark. A compact, centered toolbar, floating at the top or bottom of the editor as
 Settings chooses, provides New, local zoom, persistent block style, font
@@ -998,8 +998,9 @@ Import and export are keyboard-only (⌘O, ⌘S) so the toolbar stays limited to
 Closing does not offer export because the CRDT store is authoritative and a Markdown copy
 must not be mistaken for a mirrored working file.
 
-**Cost:** in the light appearance the editor ground no longer matches the app-icon tile; the
-icon keeps its deep-blue ground in both. Every colour must come from a token defined for both
+**Cost:** the editor ground no longer matches the app-icon tile in either appearance; the icon
+keeps its deep-blue ground. **Amended:** dark used that deep blue as its ground too, which read as
+a tint rather than as dark; it is now neutral, like Apple's own editors. Every colour must come from a token defined for both
 palettes, and accent and status hues are darker in light so they hold contrast on a pale ground.
 Changing the ground or mark also requires keeping the style tokens, canonical `assets/orbit/`
 sources, generated desktop and web assets, and `DESIGN.md` in sync.

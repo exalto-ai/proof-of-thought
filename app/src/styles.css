@@ -1,19 +1,20 @@
 /*
- * Deep blue, system sans, as little chrome as the app can get away with.
+ * Neutral grounds, system sans, as little chrome as the app can get away with.
  *
- * The supplied logo ground is #0c1622 and is the dark window ground. Light is
- * a sibling palette, not a tint of it: Auto follows the system, and Settings
- * can pin either one through `data-theme` on the root (see theme.ts).
+ * Dark is a neutral near-black, as in Apple's own editors; the app icon keeps
+ * its deep-blue tile. Light is a sibling palette, not a tint of it: Auto
+ * follows the system, and Settings can pin either one through `data-theme`
+ * on the root (see theme.ts).
  */
 :root {
   color-scheme: dark;
-  --paper: #0c1622;
-  --ink: #edf3f9;
-  --ink-soft: #a8b5c4;
-  --ink-faint: #718095;
-  --rule: #283748;
-  --raised: #182533;
-  --overlay: rgba(2, 7, 12, 0.68);
+  --paper: #1e1e1f;
+  --ink: #ececed;
+  --ink-soft: #a9a9ad;
+  --ink-faint: #7b7b81;
+  --rule: #38383b;
+  --raised: #2a2a2c;
+  --overlay: rgba(0, 0, 0, 0.62);
   --accent: #6ea1ff;
   --status-positive: #76c392;
   --status-positive-soft: #9bd5ae;
@@ -46,7 +47,7 @@
   --window-buttons-end: 84px;
 }
 
-/* The light palette keeps the blue bias of the dark neutrals. Its accent and
+/* The light palette's neutrals carry a slight cool bias. Its accent and
    status hues are darker so they hold contrast on a pale ground. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {

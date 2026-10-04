@@ -1,16 +1,17 @@
 # Design
 
-One ground, one accent, and one mark per appearance, and the files that define
-them. The dark appearance begins with the deep blue supplied with the current
-logo; the light appearance is its sibling, not a tint of it.
+One ground and one accent per appearance, one mark, and the files that define
+them. Both grounds are neutral; the deep blue supplied with the logo belongs to
+the app icon. The light appearance is the dark one's sibling, not a tint of it.
 If a second colour starts carrying interface meaning, it belongs in this
 document or it does not belong in the app.
 
-## Deep blue ground and Proof Blue
+## Dark palette and Proof Blue
 
 | Token | Value | Use |
 | --- | --- | --- |
-| Ground | `#0c1622` | Window, editor, app-icon tile |
+| Ground | `#1e1e1f` | Window and editor in the dark appearance |
+| Icon tile | `#0c1622` | App-icon ground (`assets/icon-manifest.json`) only |
 | Accent | `#6ea1ff` | Caret, focus, active formatting, links |
 | Positive | `#76c392` | Connected, saved, available, and Verified state |
 | Positive text | `#9bd5ae` | Positive status copy on the ground |
@@ -26,9 +27,9 @@ copies identical and in step with the dark token set.
 
 ## Light palette
 
-Settings offers Auto, Light, and Dark. Dark is the table above and the default; Light is a
+Settings offers Auto, Light, and Dark, and Auto is the default. Dark is the table above; Light is a
 sibling palette selected by `prefers-color-scheme` under Auto or by `data-theme="light"`. It keeps
-the blue-biased neutrals and darkens the accent and status hues so they hold contrast on a pale
+slightly cool neutrals and darkens the accent and status hues so they hold contrast on a pale
 ground. The app icon keeps its deep-blue tile in both.
 
 | Token | Value |
@@ -40,8 +41,8 @@ ground. The app icon keeps its deep-blue tile in both.
 | Negative / text | `#c4473e` / `#9e2f28` |
 
 The rest of the palette in that file, including `--ink`, `--ink-soft`,
-`--ink-faint`, `--rule`, and `--raised`, is the neutral ramp. The greys carry a
-slight blue bias so they sit with the accent rather than beside it.
+`--ink-faint`, `--rule`, and `--raised`, is the neutral ramp. The greys are
+neutral in dark and carry a slight cool bias in light.
 
 The six `--status-*` variables are the non-accent semantic palette. They report
 outcomes and lifecycle state whose meaning is also present in text, structure,
