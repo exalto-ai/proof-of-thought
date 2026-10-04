@@ -121,18 +121,33 @@ impl CredentialFiles {
         }
         create_private_directory(&self.directory)?;
         let path = self.path(connection_id)?;
-        let temporary = self.directory.join(format!(".{connection_id}.tmp"));
-        let mut options = OpenOptions::new();
-        options.create(true).truncate(true).write(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
+        // A fresh name per write, created exclusively: a leftover temporary
+        // file from an interrupted write can neither block this one nor lend
+        // the credential its own, possibly wider, permissions.
+        let nonce = &discovery::random_token()?[..16];
+        let temporary = self.directory.join(format!(".{connection_id}.{nonce}.tmp"));
+        let result = (|| {
+            let mut options = OpenOptions::new();
+            options.create_new(true).write(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            let mut file = options.open(&temporary)?;
+            file.write_all(value.as_bytes())?;
+            file.sync_all()?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o600))?;
+            }
+            std::fs::rename(&temporary, &path)
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
         }
-        let mut file = options.open(&temporary)?;
-        file.write_all(value.as_bytes())?;
-        file.sync_all()?;
-        std::fs::rename(temporary, path)
+        result
     }
 
     pub fn remove(&self, connection_id: &str) -> std::io::Result<()> {
@@ -413,6 +428,36 @@ pub fn now_ms() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn credential_writes_are_owner_only_despite_leftover_temporaries() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().unwrap();
+        let credentials = CredentialFiles::new(directory.path());
+        let id = "a".repeat(32);
+        let secret = discovery::random_token().unwrap();
+        // What an interrupted write under the old fixed name could leave behind.
+        let leftover = directory.path().join(format!(".{id}.tmp"));
+        std::fs::write(&leftover, "stale").unwrap();
+        std::fs::set_permissions(&leftover, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        credentials.write(&id, &secret).unwrap();
+
+        assert_eq!(credentials.read(&id).unwrap(), secret);
+        let mode = std::fs::metadata(credentials.path(&id).unwrap())
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+        let temporaries = std::fs::read_dir(directory.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path() != leftover)
+            .filter(|entry| entry.file_name().to_string_lossy().ends_with(".tmp"))
+            .count();
+        assert_eq!(temporaries, 0);
+    }
 
     #[test]
     fn reset_invalidates_the_previous_credential() {
