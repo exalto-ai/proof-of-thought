@@ -638,10 +638,14 @@ fn streamed_response(mut response: ureq::http::Response<ureq::Body>) -> Result<V
     result
 }
 
-/// Parse server-sent events and return the final response object.
+/// Parse server-sent events and return the final response object. With plan
+/// usage, `response.completed` carries only metadata: the visible text arrives
+/// in `response.output_text.delta` events and is folded back in as the
+/// response's message output, so the rest of chat reads it like any reply.
 fn final_streamed_response(body: &[u8]) -> Result<Value, String> {
     let text = std::str::from_utf8(body)
         .map_err(|_| "ChatGPT returned an unreadable response.".to_string())?;
+    let mut streamed = String::new();
     for line in text.lines() {
         let Some(data) = line.strip_prefix("data:").map(str::trim) else {
             continue;
@@ -650,11 +654,25 @@ fn final_streamed_response(body: &[u8]) -> Result<Value, String> {
             continue;
         };
         match event.get("type").and_then(Value::as_str) {
+            Some("response.output_text.delta") => {
+                if let Some(delta) = event.get("delta").and_then(Value::as_str) {
+                    streamed.push_str(delta);
+                }
+            }
             Some("response.completed" | "response.incomplete") => {
-                return event
+                let mut response = event
                     .get("response")
                     .cloned()
-                    .ok_or_else(|| "ChatGPT returned an incomplete response.".to_string());
+                    .ok_or_else(|| "ChatGPT returned an incomplete response.".to_string())?;
+                // Keep a completion's own text; fill in from deltas only when
+                // it carries none.
+                if !streamed.is_empty() && visible_text(Provider::Chatgpt, &response).is_err() {
+                    response["output"] = serde_json::json!([{
+                        "type": "message",
+                        "content": [{ "type": "output_text", "text": streamed }],
+                    }]);
+                }
+                return Ok(response);
             }
             Some("response.failed" | "error") => {
                 let code = event
@@ -774,6 +792,21 @@ mod tests {
             visible_text(Provider::Chatgpt, &value).unwrap(),
             ("Hi there".into(), true)
         );
+    }
+
+    #[test]
+    fn streamed_text_comes_from_deltas_when_completion_is_metadata_only() {
+        let body = concat!(
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hello \"}\n\n",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"there\"}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"model\":\"gpt-plan\"}}\n\n",
+        );
+        let value = final_streamed_response(body.as_bytes()).unwrap();
+        assert_eq!(
+            visible_text(Provider::Chatgpt, &value).unwrap(),
+            ("Hello there".into(), true)
+        );
+        assert_eq!(value["model"], json!("gpt-plan"));
     }
 
     #[test]
