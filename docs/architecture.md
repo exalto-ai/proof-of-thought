@@ -279,7 +279,7 @@ since changed), so the right response is to tell the agent what moved, not to fa
 **Reviewer proposal**
 
 ```
-suggest_change(doc_id, request_id, content_revision, change, explanation?)
+suggest_change(doc_id, request_id, content_revision, change, explanation?, group?)
 list_suggestions(doc_id)
 ```
 

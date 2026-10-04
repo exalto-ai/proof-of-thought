@@ -234,6 +234,25 @@ impl From<SuggestedChangeParams> for SuggestedChange {
     }
 }
 
+/// A change made of several proposals, decided as one.
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+pub struct SuggestGroupParams {
+    /// Your id for the change: letters, digits, `.`, `_`, `-`, or `:`. Every
+    /// proposal with the same id is accepted or rejected together.
+    pub id: String,
+    /// A short name the user sees for the whole change, such as "Tighten the draft".
+    pub label: String,
+}
+
+/// A reviewer's group, scoped to its connection so two reviewers' ids never
+/// merge into one decision.
+fn scoped_group(connection_id: &str, group: SuggestGroupParams) -> thought_core::SuggestionGroup {
+    thought_core::SuggestionGroup {
+        id: format!("{connection_id}:{}", group.id),
+        label: group.label,
+    }
+}
+
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 pub struct SuggestParams {
     pub doc_id: String,
@@ -244,6 +263,10 @@ pub struct SuggestParams {
     pub change: SuggestedChangeParams,
     #[serde(default)]
     pub explanation: Option<String>,
+    /// Group proposals the user would judge as one decision, such as every
+    /// edit of one rewrite. Leave it out for a change that stands alone.
+    #[serde(default)]
+    pub group: Option<SuggestGroupParams>,
     #[serde(flatten)]
     pub caller: Caller,
 }
@@ -355,6 +378,7 @@ impl Thought {
             .clone();
         let reported_model = p.caller.model.clone();
         let (actor, context) = self.mutation_identity(&principal, &authorized, &p.caller)?;
+        let group = p.group.map(|group| scoped_group(&connection_id, group));
         let outcome = self
             .workspace
             .propose_suggestion(
@@ -367,7 +391,7 @@ impl Thought {
                 &connection_id,
                 &actor,
                 &context,
-                None,
+                group,
             )
             .map_err(failed)?;
         Ok(Json(serde_json::to_value(outcome).map_err(failed)?))
@@ -608,5 +632,29 @@ impl rmcp::ServerHandler for Thought {
             ttl_ms: supports_cache_hints.then_some(0),
             cache_scope: supports_cache_hints.then_some(rmcp::model::CacheScope::Private),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reviewer_groups_are_optional_and_scoped_to_the_connection() {
+        let base = serde_json::json!({
+            "doc_id": "doc",
+            "request_id": "r1",
+            "content_revision": "rev",
+            "change": { "kind": "delete_block", "block_id": "1:0" },
+        });
+        let alone: SuggestParams = serde_json::from_value(base.clone()).unwrap();
+        assert!(alone.group.is_none());
+
+        let mut grouped = base;
+        grouped["group"] = serde_json::json!({ "id": "rewrite", "label": "Tighten the draft" });
+        let grouped: SuggestParams = serde_json::from_value(grouped).unwrap();
+        let group = scoped_group("reviewer-one", grouped.group.unwrap());
+        assert_eq!(group.id, "reviewer-one:rewrite");
+        assert_eq!(group.label, "Tighten the draft");
     }
 }

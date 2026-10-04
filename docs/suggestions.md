@@ -57,7 +57,8 @@ applies every pending member, in the order proposed, as one CRDT update. A membe
 replacement changed a block's type, and so its id, is followed by later members that name the
 old id. If any member is stale, nothing is applied: a group is one decision, and accepting part
 of it could leave the note half rewritten. `/reject` rejects every pending member. Built-in chat
-sets groups; MCP reviewers do not yet.
+names a group for every edit. MCP reviewers may pass `group: { id, label }` to `suggest_change`;
+the daemon prefixes the id with the connection's, so two reviewers' groups never merge.
 
 ## Stale proposals
 
