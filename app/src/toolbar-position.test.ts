@@ -12,11 +12,11 @@ afterEach(() => {
 });
 
 describe("toolbar position", () => {
-  it("defaults to the top for missing, unknown, or unavailable storage", () => {
-    expect(readToolbarPosition(null)).toBe("top");
+  it("defaults to the bottom for missing, unknown, or unavailable storage", () => {
+    expect(readToolbarPosition(null)).toBe("bottom");
     expect(
       readToolbarPosition(memoryStorage({ [TOOLBAR_POSITION_STORAGE_KEY]: "left" })),
-    ).toBe("top");
+    ).toBe("bottom");
     expect(writeToolbarPosition(null, "bottom")).toBe(false);
   });
 

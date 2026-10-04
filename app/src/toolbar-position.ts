@@ -15,7 +15,7 @@ export function isToolbarPosition(value: unknown): value is ToolbarPosition {
 
 export function readToolbarPosition(storage: Storage | null): ToolbarPosition {
   const value = readItem(storage, TOOLBAR_POSITION_STORAGE_KEY);
-  return isToolbarPosition(value) ? value : "top";
+  return isToolbarPosition(value) ? value : "bottom";
 }
 
 export function writeToolbarPosition(
@@ -25,7 +25,7 @@ export function writeToolbarPosition(
   return writeItem(storage, TOOLBAR_POSITION_STORAGE_KEY, position);
 }
 
-/** Top is the stylesheet default, so only Bottom needs a marker. */
+/** Top is the stylesheet's layout, so only Bottom needs a marker. */
 export function applyToolbarPosition(root: HTMLElement, position: ToolbarPosition): void {
   if (position === "bottom") root.dataset.toolbar = "bottom";
   else delete root.dataset.toolbar;
