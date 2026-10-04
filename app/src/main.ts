@@ -7,6 +7,7 @@ import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import type { Editor } from "@tiptap/core";
 import { installAiSupport } from "./ai-support";
+import { installDocumentSidebar } from "./doc-sidebar";
 import { createEditor } from "./editor";
 import { EditorApi } from "./editor-api";
 import { installCurrentSources } from "./current-sources";
@@ -92,6 +93,19 @@ const aiSupport = installAiSupport(document, {
     invoke<void>("open_settings").catch((error) =>
       notify(`Could not open Settings: ${reason(error)}`, "error"),
     ),
+  onNotice: notify,
+});
+
+const docSidebar = installDocumentSidebar(document, {
+  storage: safeLocalStorage(),
+  // Both run only after boot has connected; until then there is nothing to list.
+  list: async () => (mcp ? mcp.listDocuments(500) : []),
+  search: async (query) => (mcp ? mcp.search(query) : []),
+  open: (docId) => openDocument(docId),
+  create: async () => {
+    await createNewDocument();
+    await docSidebar.refresh();
+  },
   onNotice: notify,
 });
 
@@ -188,6 +202,7 @@ function refreshTitle(editor: Editor) {
   document.title = title;
   void nativeWindow()?.setTitle(title);
   if (open?.editor === editor && openDocId) {
+    docSidebar.setCurrent(openDocId, title);
     const current = open;
     aiSupport.setCurrentDocument({
       id: openDocId,
@@ -375,7 +390,10 @@ async function openDocument(docId: string): Promise<boolean> {
     if (hydrated) currentSources.scheduleRefresh();
   });
   const stopSourceSaveStatus = provider.subscribeSaveStatus((status) => {
-    if (status === "saved") currentSources.scheduleRefresh();
+    if (status === "saved") {
+      currentSources.scheduleRefresh();
+      docSidebar.scheduleRefresh();
+    }
   });
   editor.on("destroy", stopSourceHydration);
   editor.on("destroy", stopSourceSaveStatus);
@@ -627,6 +645,7 @@ async function trashSelected() {
     try {
       await editorApi.setDocumentDeleted(row.doc_id, false);
       notify(`Restored "${row.title || "Untitled"}"`);
+      void docSidebar.refresh();
       await refreshResults();
     } catch (error) {
       notify(`Could not restore: ${reason(error)}`, "error");
@@ -639,6 +658,7 @@ async function trashSelected() {
   try {
     await editorApi.setDocumentDeleted(row.doc_id, true);
     notify(`Moved "${row.title || "Untitled"}" to the trash · ${ACCEL_LABEL}⇧⌫ to find it`);
+    void docSidebar.refresh();
   } catch (error) {
     notify(`Could not trash: ${reason(error)}`, "error");
     return;
@@ -836,6 +856,7 @@ async function boot() {
   }
 
   await openDocument(targetId);
+  void docSidebar.refresh();
   if (requested) {
     // Keep the pin through all fallible startup work. A transient read or sync
     // failure must not turn Reload into a different document.

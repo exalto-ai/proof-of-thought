@@ -13,9 +13,10 @@
   </head>
   <body>
     <header class="chrome" data-tauri-drag-region>
+      <button class="panel-toggle" id="doc-sidebar-toggle" type="button" aria-controls="doc-sidebar" aria-expanded="false" aria-label="documents sidebar" title="Show documents sidebar"></button>
       <span class="presence" id="presence"></span>
       <button class="status" id="status" title="Connections" aria-haspopup="dialog"></button>
-      <button class="ai-support-toggle" id="ai-support-toggle" type="button" aria-controls="ai-support-sidebar" aria-expanded="false" aria-label="AI sidebar" title="Show AI sidebar"></button>
+      <button class="panel-toggle" id="ai-support-toggle" type="button" aria-controls="ai-support-sidebar" aria-expanded="false" aria-label="AI sidebar" title="Show AI sidebar"></button>
     </header>
 
     <div class="popover" id="connections" hidden role="dialog" aria-label="Connections">
@@ -31,12 +32,22 @@
     </div>
 
     <div class="workspace">
+      <aside class="side-panel doc-sidebar" id="doc-sidebar" data-side-panel aria-label="Documents" tabindex="-1" hidden>
+        <div class="doc-sidebar-header">
+          <input type="search" id="doc-filter" placeholder="Search" aria-label="Search documents" autocomplete="off" spellcheck="false" />
+          <button class="doc-new" id="doc-new" type="button" aria-label="New document" title="New document"></button>
+        </div>
+        <nav class="doc-list" id="doc-list" aria-label="Documents"></nav>
+        <p class="doc-list-empty" id="doc-list-empty" hidden></p>
+      </aside>
+      <div class="side-panel-resizer" id="doc-sidebar-resizer" role="separator" aria-orientation="vertical" aria-controls="doc-sidebar" aria-label="Resize documents sidebar" tabindex="0" hidden></div>
+
       <main class="page">
         <div id="editor" class="editor"></div>
       </main>
 
-      <div class="ai-sidebar-resizer" id="ai-sidebar-resizer" role="separator" aria-orientation="vertical" aria-controls="ai-support-sidebar" aria-label="Resize AI sidebar" tabindex="0" hidden></div>
-      <aside class="ai-sidebar" id="ai-support-sidebar" aria-labelledby="ai-support-title" tabindex="-1" hidden>
+      <div class="side-panel-resizer" id="ai-sidebar-resizer" role="separator" aria-orientation="vertical" aria-controls="ai-support-sidebar" aria-label="Resize AI sidebar" tabindex="0" hidden></div>
+      <aside class="side-panel ai-sidebar" id="ai-support-sidebar" data-side-panel aria-labelledby="ai-support-title" tabindex="-1" hidden>
         <header class="ai-sidebar-header">
           <h2 id="ai-support-title">AI</h2>
           <button class="text-button" id="ai-open-settings" type="button">Settings</button>

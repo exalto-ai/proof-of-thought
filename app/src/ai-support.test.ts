@@ -6,8 +6,6 @@ import {
   AI_SIDEBAR_WIDTH_STORAGE_KEY,
   PROVIDER_KEYS_CHANGED_STORAGE_KEY,
   SIDEBAR_DEFAULT_WIDTH,
-  SIDEBAR_MIN_WIDTH,
-  clampSidebarWidth,
   installAiSupport,
 } from "./ai-support";
 import type { ProProviderBridge, ProviderConfiguration } from "./pro-provider-bridge";
@@ -150,19 +148,10 @@ describe("AI sidebar", () => {
     expect(storage.getItem(AI_SIDEBAR_WIDTH_STORAGE_KEY)).toBe(
       String(SIDEBAR_DEFAULT_WIDTH + 16),
     );
-    expect(sidebar().style.getPropertyValue("--ai-sidebar-width")).toBe(
+    expect(sidebar().style.getPropertyValue("--panel-width")).toBe(
       `${SIDEBAR_DEFAULT_WIDTH + 16}px`,
     );
     expect(resizer.getAttribute("aria-valuenow")).toBe(String(SIDEBAR_DEFAULT_WIDTH + 16));
     controller.destroy();
-  });
-});
-
-describe("sidebar width", () => {
-  it("never squeezes the editor or the sidebar below their minimums", () => {
-    expect(clampSidebarWidth(100, 1200)).toBe(SIDEBAR_MIN_WIDTH);
-    expect(clampSidebarWidth(2000, 1200)).toBe(720);
-    expect(clampSidebarWidth(600, 900)).toBe(480);
-    expect(clampSidebarWidth(600, 500)).toBe(SIDEBAR_MIN_WIDTH);
   });
 });

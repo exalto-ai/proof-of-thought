@@ -160,7 +160,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .status[data-state="connected"] { background: var(--status-positive); }
 .status[data-state="connecting"] { background: var(--status-caution); }
 .status[data-state="offline"] { background: var(--status-negative); }
-.ai-support-toggle {
+.panel-toggle {
   display: inline-grid;
   place-items: center;
   width: 28px;
@@ -172,7 +172,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   color: var(--ink-soft);
   cursor: default;
 }
-.ai-support-toggle svg {
+.panel-toggle svg {
   width: 16px;
   height: 16px;
   fill: none;
@@ -181,27 +181,27 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.ai-support-toggle .panel-fill {
+.panel-toggle .panel-fill {
   fill: currentColor;
   stroke: none;
   opacity: 0;
   transition: opacity 120ms ease;
 }
-.ai-support-toggle:hover {
+.panel-toggle:hover {
   color: var(--ink);
   background: color-mix(in srgb, var(--ink) 7%, transparent);
 }
-.ai-support-toggle:focus-visible {
+.panel-toggle:focus-visible {
   color: var(--ink);
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 /* Open: the icon's own sidebar column fills in. Closed: an empty outline.
    Ink rather than accent — this is view state, not a formatting command. */
-.ai-support-toggle[aria-expanded="true"] { color: var(--ink); }
-.ai-support-toggle[aria-expanded="true"] .panel-fill { opacity: 0.55; }
+.panel-toggle[aria-expanded="true"] { color: var(--ink); }
+.panel-toggle[aria-expanded="true"] .panel-fill { opacity: 0.55; }
 @media (prefers-reduced-motion: reduce) {
-  .ai-support-toggle .panel-fill { transition: none; }
+  .panel-toggle .panel-fill { transition: none; }
 }
 
 /* ---------- workspace and AI sidebar ---------- */
@@ -215,7 +215,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 
 /* The draggable border. A wide, invisible hit area around a hairline that
    lights up with the accent while it is the thing being worked. */
-.ai-sidebar-resizer {
+.side-panel-resizer {
   position: relative;
   z-index: 3;
   flex: 0 0 auto;
@@ -224,8 +224,8 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   cursor: col-resize;
   touch-action: none;
 }
-.ai-sidebar-resizer[hidden] { display: none; }
-.ai-sidebar-resizer::before {
+.side-panel-resizer[hidden] { display: none; }
+.side-panel-resizer::before {
   content: "";
   position: absolute;
   top: 0;
@@ -235,22 +235,22 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   background: var(--rule);
   transition: background 120ms ease, box-shadow 120ms ease;
 }
-.ai-sidebar-resizer:hover::before,
-.ai-sidebar-resizer:focus-visible::before,
-.is-resizing-sidebar .ai-sidebar-resizer::before {
+.side-panel-resizer:hover::before,
+.side-panel-resizer:focus-visible::before,
+.is-resizing-panel .side-panel-resizer::before {
   background: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
-.ai-sidebar-resizer:focus-visible { outline: none; }
-.is-resizing-sidebar,
-.is-resizing-sidebar * {
+.side-panel-resizer:focus-visible { outline: none; }
+.is-resizing-panel,
+.is-resizing-panel * {
   cursor: col-resize !important;
   user-select: none !important;
 }
 
-.ai-sidebar {
+.side-panel {
   flex: 0 0 auto;
-  width: var(--ai-sidebar-width, 360px);
+  width: var(--panel-width, 360px);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -258,8 +258,98 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   background: color-mix(in srgb, var(--raised) 45%, var(--paper));
   font-size: 13px;
 }
-.ai-sidebar[hidden] { display: none; }
-.ai-sidebar:focus { outline: none; }
+.side-panel[hidden] { display: none; }
+.side-panel:focus { outline: none; }
+
+/* ---------- documents sidebar ---------- */
+.doc-sidebar-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px 6px;
+}
+#doc-filter {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 13px/1 var(--sans);
+}
+#doc-filter:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--rule));
+  outline: none;
+}
+.doc-new {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: default;
+}
+.doc-new:hover,
+.doc-new:focus-visible {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  outline: none;
+}
+.doc-new svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.doc-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 12px;
+}
+.doc-list section + section { margin-top: 10px; }
+.doc-group {
+  margin: 8px 8px 3px;
+  color: var(--ink-faint);
+  font: 600 11px/1.3 var(--sans);
+}
+.doc-list ul { margin: 0; padding: 0; list-style: none; }
+.doc-row {
+  width: 100%;
+  display: grid;
+  gap: 1px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: default;
+}
+.doc-row:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.doc-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.doc-row[aria-current="page"] { background: color-mix(in srgb, var(--ink) 11%, transparent); }
+.doc-row-title,
+.doc-row-date {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-row-title { font: 500 13px/1.35 var(--sans); }
+.doc-row-date { color: var(--ink-faint); font-size: 11.5px; }
+.doc-list-empty { margin: 4px 18px; color: var(--ink-faint); font-size: 12.5px; }
+.doc-list-empty[hidden] { display: none; }
 .ai-sidebar-header {
   flex: 0 0 auto;
   display: flex;

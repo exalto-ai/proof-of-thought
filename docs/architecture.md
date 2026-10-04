@@ -936,6 +936,17 @@ right sidebar, open by default and resizable by dragging its border, holds built
 current text's recorded sources. A title-bar toggle is its only show/hide control, and the choice
 and width are remembered per machine.
 
+A matching left sidebar lists every document, newest first, grouped by recency (Today,
+Yesterday, Previous 7 and 30 Days, then by month and year) with a search field backed by the
+same FTS `search`. Documents are a flat set named by their own first line, so this is a list,
+not a tree. Clicking a row opens it in this window like the ⌘K switcher; New opens a separate
+window like ⌘N. Order comes from the daemon's `updated_at`, re-read on focus and after a local
+save, so opening a document never makes it look recently edited.
+
+**Cost:** two open sidebars leave the editor less room by default, so both share one minimum
+editor width that neither drag can take. The daemon pushes no list changes, so another window's
+new document appears when this window regains focus rather than immediately.
+
 Configuration lives in one app-wide Settings window (Proof of Thought → Settings…, ⌘,):
 appearance, provider keys for built-in chat, and connected apps. The sidebar only asks whether a
 provider key exists; with none it points to Settings, and with exactly one it selects that
