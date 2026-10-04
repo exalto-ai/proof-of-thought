@@ -102,10 +102,7 @@ const docSidebar = installDocumentSidebar(document, {
   list: async () => (mcp ? mcp.listDocuments(500) : []),
   search: async (query) => (mcp ? mcp.search(query) : []),
   open: (docId) => openDocument(docId),
-  create: async () => {
-    await createNewDocument();
-    await docSidebar.refresh();
-  },
+  create: () => createNewDocument(),
   onNotice: notify,
 });
 
@@ -683,33 +680,32 @@ async function trashSelected() {
   }
 }
 
-async function createDocumentInNewWindow(title: string) {
-  // Browser development has no native window API and falls back to replacing
-  // its preview editor, so it still needs the same durability guard.
-  if (!isTauri() && !(await canLeaveCurrentDocument())) return;
+/** Create a document and show it in this window, as Notes does. */
+async function createDocumentHere(title: string) {
+  if (!(await canLeaveCurrentDocument())) return;
   try {
     const created = await editorApi.createDocument(title);
     els.scrim.hidden = true;
     toggleConnections(false);
-    try {
-      await showDocumentInNewWindow(created.doc_id);
-    } catch (error) {
-      notify(
-        `Document was created, but its window could not open: ${reason(error)}`,
-        "error",
-      );
-    }
+    await openDocument(created.doc_id);
+    void docSidebar.refresh();
   } catch (error) {
     notify(`Could not create document: ${reason(error)}`, "error");
   }
 }
 
 async function createNewDocument() {
-  await createDocumentInNewWindow("");
+  await createDocumentHere("");
 }
 
 async function createFromQuery() {
-  await createDocumentInNewWindow(els.input.value.trim());
+  await createDocumentHere(els.input.value.trim());
+}
+
+/** Show an imported or newly created document here and list it. */
+async function showDocumentHere(docId: string): Promise<void> {
+  await openDocument(docId);
+  void docSidebar.refresh();
 }
 
 async function importMarkdownFile() {
@@ -719,7 +715,7 @@ async function importMarkdownFile() {
     const file = await importMarkdownDocument(
       nativeFileBridge,
       editorApi,
-      showDocumentInNewWindow,
+      showDocumentHere,
     );
     if (file) notify(`Imported “${file.file_name}” as a new document`);
   } catch (error) {
@@ -750,14 +746,6 @@ async function exportMarkdownFile(target = open): Promise<boolean> {
  * Native windows are document-scoped. Browser development has no window API,
  * so it deliberately falls back to replacing the one preview editor.
  */
-async function showDocumentInNewWindow(docId: string): Promise<void> {
-  if (isTauri()) {
-    await invoke("new_window", { docId });
-    return;
-  }
-  await openDocument(docId);
-}
-
 // ---------------------------------------------------------------- keys
 
 document.addEventListener("keydown", (event) => {

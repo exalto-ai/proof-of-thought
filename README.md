@@ -50,10 +50,10 @@ npm run tauri dev --prefix app
 ```
 
 The app starts the daemon itself. Press ⌘K to switch documents, ⌘N to create a blank
-document in its own window, ⌘O to import a Markdown snapshot into its own window, and ⌘S
-to export a one-time Markdown copy of the visible document. The toolbar reports Autosaved
-only after the daemon confirms the latest edit reached SQLite. New documents never replace
-the editor you are already using, and each new window is visibly cascaded from its source.
+document, ⌘O to import a Markdown snapshot as a new document, and ⌘S to export a one-time
+Markdown copy of the visible document. New and imported documents open in the current window,
+like switching to one; the documents sidebar lists them all. The toolbar reports Autosaved
+only after the daemon confirms the latest edit reached SQLite.
 ⌘W closes the window without prompting because Proof of Thought's CRDT store remains
 authoritative. Export is an explicit one-time action and never establishes a mirrored file.
 

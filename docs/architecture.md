@@ -944,8 +944,7 @@ the top-right corner whether or not their sidebars show.
 A matching left sidebar lists every document, newest first, grouped by recency (Today,
 Yesterday, Previous 7 and 30 Days, then by month and year) with a search field backed by the
 same FTS `search`. Documents are a flat set named by their own first line, so this is a list,
-not a tree. Clicking a row opens it in this window like the ⌘K switcher; New opens a separate
-window like ⌘N. Order comes from the daemon's `updated_at`, re-read on focus and after a local
+not a tree. Clicking a row opens it in this window like the ⌘K switcher, and so does New. Order comes from the daemon's `updated_at`, re-read on focus and after a local
 save, so opening a document never makes it look recently edited.
 
 **Cost:** two open sidebars leave the editor less room by default, so both share one minimum
@@ -973,10 +972,16 @@ app-wide Settings window (Proof of Thought → Settings…, ⌘,) offers Auto (f
 Light, and Dark. A compact, centered toolbar, floating at the top or bottom of the editor as
 Settings chooses, provides New, local zoom, persistent block style, font
 size, bold, italic, and link commands. Clicking linked text opens an action card with
-explicit open, copy, edit, and remove commands instead of navigating immediately. ⌘N
-creates a blank document in its own window, visibly cascaded from and leaving the current
-editor connected. The Connections action follows the same separate-document behavior. A
-window can still open an existing document through the switcher. ⌘W closes the window;
+explicit open, copy, edit, and remove commands instead of navigating immediately. ⌘N,
+New, and Markdown import create a document and open it in the current window, as Notes does,
+after the same autosave check as switching documents; the documents sidebar lists every
+document, so a new one is never lost behind the current editor. The Connections popover's
+New document window still opens a separate, visibly cascaded window.
+
+**Amended:** New used to open every document in its own window so it never replaced the
+editor in use. With a documents sidebar that is no longer needed to keep work reachable, and it
+filled the screen with windows. **Cost:** creating a document now leaves the previous one, which
+stays one click away in the sidebar or switcher. ⌘W closes the window;
 export remains an explicit action rather than an exit prompt.
 
 The database and CRDT remain authoritative. Import reads a Markdown snapshot into one new
