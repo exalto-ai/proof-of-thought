@@ -465,11 +465,6 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   padding: 0 12px 12px;
 }
 .pro-chat[hidden] { display: none; }
-.pro-chat-top {
-  display: flex;
-  justify-content: flex-end;
-  min-height: 4px;
-}
 .pro-chat-empty {
   flex: 1 1 auto;
   display: flex;

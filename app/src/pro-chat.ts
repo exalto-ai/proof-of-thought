@@ -387,7 +387,8 @@ export function installProChat(
   const form = required<HTMLFormElement>(panel, "#pro-chat-form", "chat");
   const input = required<HTMLTextAreaElement>(panel, "#pro-chat-input", "chat");
   const send = required<HTMLButtonElement>(panel, "#pro-chat-send", "chat");
-  const newChat = required<HTMLButtonElement>(panel, "#pro-chat-new", "chat");
+  // Optional: the window does not offer New chat for now.
+  const newChat = panel.querySelector<HTMLButtonElement>("#pro-chat-new");
   const attach = required<HTMLButtonElement>(panel, "#pro-chat-attach", "chat");
   const attachmentInput = required<HTMLInputElement>(panel, "#pro-chat-attachment-input", "chat");
   const attachmentList = required<HTMLUListElement>(panel, "#pro-chat-attachments", "chat");
@@ -527,13 +528,19 @@ export function installProChat(
         `${attachment.name} (${fileSize(attachment.size_bytes)})`).join(", ")}`;
       item.append(attachments);
     }
-    if (message.meta || message.incomplete) {
+    // Which provider and model answered is kept for attribution, but quietly:
+    // a tooltip and screen-reader text rather than a line under every reply.
+    if (message.meta) {
+      item.title = message.meta;
       const meta = root.createElement("small");
-      meta.textContent = [
-        message.meta,
-        message.incomplete ? "Provider marked this response incomplete" : null,
-      ].filter(Boolean).join(" · ");
+      meta.className = "sr-only";
+      meta.textContent = message.meta;
       item.append(meta);
+    }
+    if (message.incomplete) {
+      const incomplete = root.createElement("small");
+      incomplete.textContent = "Provider marked this response incomplete";
+      item.append(incomplete);
     }
     if (message.response?.complete && options.suggestResponse) {
       const suggest = root.createElement("button");
@@ -562,8 +569,8 @@ export function installProChat(
     messagesElement.replaceChildren(...rendered);
     messagesElement.hidden = rendered.length === 0;
     empty.hidden = rendered.length !== 0;
-    newChat.hidden = messages.length === 0 && pendingText === null;
-    newChat.disabled = loadingModels || pendingText !== null || suggesting !== null ||
+    if (newChat) newChat.hidden = messages.length === 0 && pendingText === null;
+    if (newChat) newChat.disabled = loadingModels || pendingText !== null || suggesting !== null ||
       readingAttachments;
   }
 
@@ -1016,7 +1023,7 @@ export function installProChat(
     event.preventDefault();
     void submit();
   });
-  listen(newChat, "click", newConversation);
+  if (newChat) listen(newChat, "click", newConversation);
 
   render();
   return {
