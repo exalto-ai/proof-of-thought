@@ -7,7 +7,7 @@ import { getCurrentWindow as tauriWindow } from "@tauri-apps/api/window";
 import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import type { Editor } from "@tiptap/core";
-import { installAiSupport, safeLocalStorage } from "./ai-support";
+import { installAiSupport } from "./ai-support";
 import { createEditor } from "./editor";
 import { EditorApi } from "./editor-api";
 import { installCurrentSources } from "./current-sources";
@@ -23,6 +23,7 @@ import { installProvenanceRails, type Rails } from "./provenance";
 import { tauriProChatBridge } from "./pro-chat-bridge";
 import { tauriProProviderBridge } from "./pro-provider-bridge";
 import { SyncProvider, type AgentPresence, type ProviderStatus } from "./provider";
+import { readItem, safeLocalStorage, safeSessionStorage, writeItem } from "./storage";
 import { installTheme } from "./theme";
 import { installToolbarPosition } from "./toolbar-position";
 import {
@@ -96,8 +97,8 @@ function reason(error: unknown): string {
   return text.length > 160 ? `${text.slice(0, 157)}…` : text;
 }
 
-installTheme(safeLocalStorage(window), getCurrentWindow());
-installToolbarPosition(safeLocalStorage(window));
+installTheme(safeLocalStorage(), getCurrentWindow());
+installToolbarPosition(safeLocalStorage());
 
 const aiSupport = installAiSupport(document, {
   providerBridge: isTauri() ? tauriProProviderBridge() : null,
@@ -240,14 +241,14 @@ function renderPeers() {
  * The shared copy survives as the starting point for a brand-new window.
  */
 function rememberOpenDocument(docId: string) {
-  window.sessionStorage.setItem("thought.last", docId);
-  window.localStorage.setItem("thought.last", docId);
+  writeItem(safeSessionStorage(), "thought.last", docId);
+  writeItem(safeLocalStorage(), "thought.last", docId);
 }
 
 function lastOpenDocument(): string | null {
   return (
-    window.sessionStorage.getItem("thought.last") ??
-    window.localStorage.getItem("thought.last")
+    readItem(safeSessionStorage(), "thought.last") ??
+    readItem(safeLocalStorage(), "thought.last")
   );
 }
 

@@ -6,6 +6,8 @@
  * `storage` event without any native round trip.
  */
 
+import { readItem, writeItem } from "./storage";
+
 export const THEME_STORAGE_KEY = "thought.theme.v1";
 
 export type ThemePreference = "auto" | "light" | "dark";
@@ -19,22 +21,12 @@ export function isThemePreference(value: unknown): value is ThemePreference {
 }
 
 export function readTheme(storage: Storage | null): ThemePreference {
-  try {
-    const value = storage?.getItem(THEME_STORAGE_KEY);
-    return isThemePreference(value) ? value : "auto";
-  } catch {
-    return "auto";
-  }
+  const value = readItem(storage, THEME_STORAGE_KEY);
+  return isThemePreference(value) ? value : "auto";
 }
 
 export function writeTheme(storage: Storage | null, theme: ThemePreference): boolean {
-  if (storage === null) return false;
-  try {
-    storage.setItem(THEME_STORAGE_KEY, theme);
-    return true;
-  } catch {
-    return false;
-  }
+  return writeItem(storage, THEME_STORAGE_KEY, theme);
 }
 
 /**

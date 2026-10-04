@@ -1,4 +1,5 @@
 import { ICONS, icon } from "./icons";
+import { readItem, safeLocalStorage, writeItem } from "./storage";
 import type { ChatSuggestionInput } from "./editor-api";
 import type { ProProvider, ProProviderBridge } from "./pro-provider-bridge";
 import type { ProChatBridge } from "./pro-chat-bridge";
@@ -34,32 +35,6 @@ function required<T extends Element>(root: ParentNode, selector: string): T {
   const value = root.querySelector<T>(selector);
   if (!value) throw new Error(`missing AI sidebar element: ${selector}`);
   return value;
-}
-
-export function safeLocalStorage(target: {
-  readonly localStorage: Storage;
-}): Storage | null {
-  try {
-    return target.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-function readItem(storage: Storage | null, key: string): string | null {
-  try {
-    return storage?.getItem(key) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function writeItem(storage: Storage | null, key: string, value: string) {
-  try {
-    storage?.setItem(key, value);
-  } catch {
-    // View preferences that fail to persist reset to their defaults.
-  }
 }
 
 /** The sidebar starts open unless this user last closed it. */
@@ -101,7 +76,7 @@ export function installAiSupport(
   options: AiSupportOptions = {},
 ): AiSupportController {
   const storage = options.storage === undefined
-    ? safeLocalStorage(window)
+    ? safeLocalStorage()
     : options.storage;
   const toggle = required<HTMLButtonElement>(root, "#ai-support-toggle");
   toggle.replaceChildren(sidebarToggleIcon());

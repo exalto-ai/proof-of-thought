@@ -11,23 +11,10 @@ import {
   installAiSupport,
 } from "./ai-support";
 import type { ProProviderBridge, ProviderConfiguration } from "./pro-provider-bridge";
+import { memoryStorage } from "./test-storage";
 
 const markup = readFileSync(resolve(import.meta.dirname, "../index.html"), "utf8");
 const body = markup.slice(markup.indexOf("<body>") + 6, markup.indexOf("</body>"));
-
-function memoryStorage(initial: Record<string, string> = {}): Storage {
-  const values = new Map(Object.entries(initial));
-  return {
-    get length() {
-      return values.size;
-    },
-    clear: () => values.clear(),
-    getItem: (key) => values.get(key) ?? null,
-    key: (index) => [...values.keys()][index] ?? null,
-    removeItem: (key) => values.delete(key),
-    setItem: (key, value) => values.set(key, value),
-  };
-}
 
 function providers(configured: ProviderConfiguration["provider"][]): ProProviderBridge {
   return {

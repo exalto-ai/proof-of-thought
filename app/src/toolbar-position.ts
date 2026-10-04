@@ -3,6 +3,8 @@
  * the bottom. Shared by every window through local storage, like the theme.
  */
 
+import { readItem, writeItem } from "./storage";
+
 export const TOOLBAR_POSITION_STORAGE_KEY = "thought.toolbar-position.v1";
 
 export type ToolbarPosition = "top" | "bottom";
@@ -12,25 +14,15 @@ export function isToolbarPosition(value: unknown): value is ToolbarPosition {
 }
 
 export function readToolbarPosition(storage: Storage | null): ToolbarPosition {
-  try {
-    const value = storage?.getItem(TOOLBAR_POSITION_STORAGE_KEY);
-    return isToolbarPosition(value) ? value : "top";
-  } catch {
-    return "top";
-  }
+  const value = readItem(storage, TOOLBAR_POSITION_STORAGE_KEY);
+  return isToolbarPosition(value) ? value : "top";
 }
 
 export function writeToolbarPosition(
   storage: Storage | null,
   position: ToolbarPosition,
 ): boolean {
-  if (storage === null) return false;
-  try {
-    storage.setItem(TOOLBAR_POSITION_STORAGE_KEY, position);
-    return true;
-  } catch {
-    return false;
-  }
+  return writeItem(storage, TOOLBAR_POSITION_STORAGE_KEY, position);
 }
 
 /** Top is the stylesheet default, so only Bottom needs a marker. */

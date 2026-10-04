@@ -1,6 +1,7 @@
 import type { Editor } from "@tiptap/core";
 import { ICONS, icon } from "./icons";
 import type { SaveStatus } from "./provider";
+import { readItem, safeLocalStorage, writeItem } from "./storage";
 
 export const ZOOM_LEVELS = [75, 90, 100, 110, 125, 150, 175, 200] as const;
 export const FONT_SIZES = [12, 14, 16, 17, 18, 20, 24, 28, 32, 40, 48, 56, 64] as const;
@@ -232,13 +233,13 @@ export function installToolbar(
 
   const applyZoom = (level: number) => {
     editorElement.style.setProperty("--editor-zoom", String(level / 100));
-    window.localStorage.setItem(ZOOM_KEY, String(level));
+    writeItem(safeLocalStorage(), ZOOM_KEY, String(level));
     // Provenance rails and any other layout observers measure against editor
     // geometry. Zoom changes that geometry without producing a DOM resize.
     window.dispatchEvent(new Event("resize"));
   };
 
-  const initialZoom = safeZoom(window.localStorage.getItem(ZOOM_KEY));
+  const initialZoom = safeZoom(readItem(safeLocalStorage(), ZOOM_KEY));
   zoom.value = String(initialZoom);
   applyZoom(initialZoom);
 

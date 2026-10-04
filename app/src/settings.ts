@@ -8,7 +8,8 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { PROVIDER_KEYS_CHANGED_STORAGE_KEY, safeLocalStorage } from "./ai-support";
+import { PROVIDER_KEYS_CHANGED_STORAGE_KEY } from "./ai-support";
+import { safeLocalStorage, writeItem } from "./storage";
 import { EditorApi } from "./editor-api";
 import { Mcp, type DocumentSummary } from "./mcp";
 import { installProProvider } from "./pro-provider";
@@ -34,7 +35,7 @@ import {
 
 type Connection = { mcp_url: string; token: string; stdio_command: string };
 
-const storage = safeLocalStorage(window);
+const storage = safeLocalStorage();
 const isTauri = Boolean(
   (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__,
 );
@@ -134,11 +135,8 @@ installChoice<ToolbarPosition>(
 
 /** Tell open document windows to re-check which providers have a key. */
 function announceProviderChange() {
-  try {
-    storage?.setItem(PROVIDER_KEYS_CHANGED_STORAGE_KEY, String(Date.now()));
-  } catch {
-    // Document windows also re-check when they regain focus.
-  }
+  // If this fails, document windows still re-check when they regain focus.
+  writeItem(storage, PROVIDER_KEYS_CHANGED_STORAGE_KEY, String(Date.now()));
 }
 
 function announcingBridge(bridge: ProProviderBridge): ProProviderBridge {
