@@ -140,6 +140,7 @@ export function installSidePanel(
     dragStart = { x: pointer.clientX, width };
     resizer.setPointerCapture?.(pointer.pointerId);
     root.documentElement.classList.add("is-resizing-panel");
+    resizer.classList.add("is-dragging");
   });
   listen(resizer, "pointermove", (event) => {
     if (!dragStart) return;
@@ -150,6 +151,7 @@ export function installSidePanel(
     if (!dragStart) return;
     dragStart = null;
     root.documentElement.classList.remove("is-resizing-panel");
+    resizer.classList.remove("is-dragging");
     applyWidth(width, true);
   };
   listen(resizer, "pointerup", endDrag);

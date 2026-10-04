@@ -63,8 +63,11 @@ describe("side panel", () => {
     const resizer = document.querySelector<HTMLElement>("#left-resizer")!;
     resizer.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 240 }));
     resizer.dispatchEvent(new PointerEvent("pointermove", { clientX: 300 }));
+    // Only the border being dragged is marked, not every panel's border.
+    expect(resizer.classList.contains("is-dragging")).toBe(true);
     resizer.dispatchEvent(new PointerEvent("pointerup", { clientX: 300 }));
     expect(panel.style.getPropertyValue("--panel-width")).toBe("300px");
+    expect(resizer.classList.contains("is-dragging")).toBe(false);
     expect(storage.getItem("width")).toBe("300");
     controller.destroy();
   });

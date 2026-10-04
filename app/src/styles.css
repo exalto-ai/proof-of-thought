@@ -285,7 +285,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 }
 .side-panel-resizer:hover::before,
 .side-panel-resizer:focus-visible::before,
-.is-resizing-panel .side-panel-resizer::before {
+.side-panel-resizer.is-dragging::before {
   background: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
