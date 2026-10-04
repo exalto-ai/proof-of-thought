@@ -947,7 +947,8 @@ save, so opening a document never makes it look recently edited.
 editor width that neither drag can take. The daemon pushes no list changes, so another window's
 new document appears when this window regains focus rather than immediately.
 
-Configuration lives in one app-wide Settings window (Proof of Thought → Settings…, ⌘,):
+Configuration lives in one app-wide Settings window (Proof of Thought → Settings…, ⌘,), laid
+out like a Mac app's Settings with General, Chat, and Connected Apps toolbar tabs (⌘1–⌘3):
 appearance, provider keys for built-in chat, and connected apps. The sidebar only asks whether a
 provider key exists; with none it points to Settings, and with exactly one it selects that
 provider. There are no AI modes and no first-launch chooser. Connected reviewer proposals and

@@ -8,9 +8,15 @@
     <script type="module" src="/src/settings.ts" defer></script>
   </head>
   <body class="settings-page">
+    <nav class="settings-tabs" role="tablist" aria-label="Settings">
+      <button type="button" role="tab" id="tab-general" aria-controls="pane-general" aria-selected="true" data-pane="general" data-icon="settings">General</button>
+      <button type="button" role="tab" id="tab-chat" aria-controls="pane-chat" aria-selected="false" data-pane="chat" data-icon="messageSquare">Chat</button>
+      <button type="button" role="tab" id="tab-apps" aria-controls="pane-apps" aria-selected="false" data-pane="apps" data-icon="plug">Connected Apps</button>
+    </nav>
     <main class="settings">
       <h1 class="sr-only">Settings</h1>
 
+      <div class="settings-pane" role="tabpanel" id="pane-general" aria-labelledby="tab-general">
       <section class="settings-section" aria-labelledby="appearance-title">
         <h2 id="appearance-title">Appearance</h2>
         <div class="settings-group">
@@ -32,8 +38,11 @@
         </div>
       </section>
 
+      </div>
+
+      <div class="settings-pane" role="tabpanel" id="pane-chat" aria-labelledby="tab-chat" hidden>
       <section class="settings-section provider-settings" id="provider-settings" aria-labelledby="provider-settings-title">
-        <h2 id="provider-settings-title">Built-in chat</h2>
+        <h2 id="provider-settings-title">Provider keys</h2>
         <p class="settings-note">Add a key to chat about the current document from the AI sidebar. Keys stay in your Mac login Keychain, and adding one sends no document text. Provider API charges apply to each request.</p>
         <p class="reviewer-error" id="provider-error" role="alert" hidden></p>
         <ul class="settings-group provider-list">
@@ -41,26 +50,29 @@
             <div><strong>OpenAI</strong><span data-provider-status>No key</span></div>
             <div class="reviewer-actions">
               <button type="button" data-provider-remove hidden>Remove</button>
-              <button class="ghost" type="button" data-provider-configure>Add key</button>
+              <button type="button" data-provider-configure>Add key</button>
             </div>
           </li>
           <li class="settings-row" data-provider="anthropic">
             <div><strong>Anthropic</strong><span data-provider-status>No key</span></div>
             <div class="reviewer-actions">
               <button type="button" data-provider-remove hidden>Remove</button>
-              <button class="ghost" type="button" data-provider-configure>Add key</button>
+              <button type="button" data-provider-configure>Add key</button>
             </div>
           </li>
         </ul>
         <p class="settings-note">Proof of Thought records the selected provider, model, thinking setting, and visible exchange. Accepted wording is still labeled as reported AI output.</p>
       </section>
 
+      </div>
+
+      <div class="settings-pane" role="tabpanel" id="pane-apps" aria-labelledby="tab-apps" hidden>
       <section class="settings-section" aria-labelledby="connected-apps-title">
         <div class="settings-section-heading">
           <h2 id="connected-apps-title">Connected apps</h2>
           <div class="reviewer-heading-actions">
-            <button class="text-button" id="reviewer-refresh" type="button">Check status</button>
-            <button class="ghost" id="reviewer-add" type="button">Add app</button>
+            <button id="reviewer-refresh" type="button">Check status</button>
+            <button id="reviewer-add" type="button">Add App…</button>
           </div>
         </div>
         <p class="settings-note">Let ChatGPT desktop, Codex, Claude Desktop, or Claude Code read your documents and propose changes. Each proposal appears in the document with Accept and Reject. Connecting adds no separate API charge. The app and model are recorded as reported by the connected tool, not as provider-verified identity.</p>
@@ -93,7 +105,7 @@
           <p class="settings-note">This app can read the selected documents and propose changes for you to accept or reject. It may send document text to its own provider.</p>
           <div class="reviewer-actions">
             <button id="reviewer-cancel" type="button">Cancel</button>
-            <button class="ghost" type="submit">Save</button>
+            <button type="submit">Save</button>
           </div>
         </form>
 
@@ -104,10 +116,11 @@
           <pre id="reviewer-setup-command"></pre>
           <div class="reviewer-actions">
             <button id="reviewer-setup-done" type="button">Done</button>
-            <button class="ghost" id="reviewer-copy" type="button">Copy setup</button>
+            <button id="reviewer-copy" type="button">Copy setup</button>
           </div>
         </section>
       </section>
+      </div>
     </main>
 
     <div class="toast" id="toast" role="status" hidden></div>

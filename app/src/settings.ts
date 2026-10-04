@@ -8,7 +8,8 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { PROVIDER_KEYS_CHANGED_STORAGE_KEY } from "./ai-support";
-import { safeLocalStorage, writeItem } from "./storage";
+import { readItem, safeLocalStorage, writeItem } from "./storage";
+import { ICONS, icon } from "./icons";
 import { EditorApi } from "./editor-api";
 import { Mcp, type DocumentSummary } from "./mcp";
 import { installProProvider } from "./pro-provider";
@@ -41,6 +42,54 @@ const storage = safeLocalStorage();
 const nativeWindow = getNativeWindow();
 const notify = installToast(required<HTMLElement>(document, "#toast", "settings"));
 const reason = (error: unknown) => oneLine(error, "unknown error");
+
+// ---------------------------------------------------------------- tabs
+
+/**
+ * Toolbar tabs, as in a Mac app's Settings window: one pane at a time, the
+ * window titled after it, and the last pane remembered.
+ */
+const SETTINGS_TAB_STORAGE_KEY = "thought.settings-tab.v1";
+const tabs = [...document.querySelectorAll<HTMLButtonElement>('.settings-tabs [role="tab"]')];
+
+for (const tab of tabs) {
+  const name = tab.dataset.icon as keyof typeof ICONS | undefined;
+  if (name && name in ICONS) tab.prepend(icon(ICONS[name]));
+}
+
+function selectTab(pane: string, focus = false) {
+  const chosen = tabs.find((tab) => tab.dataset.pane === pane) ?? tabs[0];
+  for (const tab of tabs) {
+    const selected = tab === chosen;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    const panel = document.getElementById(tab.getAttribute("aria-controls") ?? "");
+    if (panel) panel.hidden = !selected;
+  }
+  if (focus) chosen.focus();
+  writeItem(storage, SETTINGS_TAB_STORAGE_KEY, chosen.dataset.pane ?? "general");
+  document.title = chosen.textContent?.trim() || "Settings";
+  void nativeWindow?.setTitle(document.title);
+}
+
+for (const [index, tab] of tabs.entries()) {
+  tab.addEventListener("click", () => selectTab(tab.dataset.pane ?? "general"));
+  tab.addEventListener("keydown", (event) => {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    selectTab(tabs[(index + step + tabs.length) % tabs.length].dataset.pane ?? "general", true);
+  });
+}
+// ⌘1, ⌘2, ⌘3 switch panes, as in most Mac Settings windows.
+document.addEventListener("keydown", (event) => {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+  const tab = tabs[Number(event.key) - 1];
+  if (!tab) return;
+  event.preventDefault();
+  selectTab(tab.dataset.pane ?? "general", true);
+});
+selectTab(readItem(storage, SETTINGS_TAB_STORAGE_KEY) ?? "general");
 
 // ---------------------------------------------------------------- appearance
 
