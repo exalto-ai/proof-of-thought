@@ -7,7 +7,7 @@ import { getCurrentWindow as tauriWindow } from "@tauri-apps/api/window";
 import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import type { Editor } from "@tiptap/core";
-import { installAiSupport } from "./ai-support";
+import { installAiSupport, safeLocalStorage } from "./ai-support";
 import { createEditor } from "./editor";
 import { EditorApi } from "./editor-api";
 import { installCurrentSources } from "./current-sources";
@@ -23,6 +23,7 @@ import { installProvenanceRails, type Rails } from "./provenance";
 import { tauriProChatBridge } from "./pro-chat-bridge";
 import { tauriProProviderBridge } from "./pro-provider-bridge";
 import { SyncProvider, type AgentPresence, type ProviderStatus } from "./provider";
+import { installTheme } from "./theme";
 import {
   installSuggestionReview,
   suggestionPositionAtSelection,
@@ -93,6 +94,8 @@ function reason(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error);
   return text.length > 160 ? `${text.slice(0, 157)}…` : text;
 }
+
+installTheme(safeLocalStorage(window), getCurrentWindow());
 
 const aiSupport = installAiSupport(document, {
   providerBridge: isTauri() ? tauriProProviderBridge() : null,

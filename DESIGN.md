@@ -1,7 +1,8 @@
 # Design
 
-One ground, one accent, one mark, and the files that define them. Every surface
-begins with the deep blue supplied with the current logo.
+One ground, one accent, and one mark per appearance, and the files that define
+them. The dark appearance begins with the deep blue supplied with the current
+logo; the light appearance is its sibling, not a tint of it.
 If a second colour starts carrying interface meaning, it belongs in this
 document or it does not belong in the app.
 
@@ -18,8 +19,22 @@ document or it does not belong in the app.
 | Negative | `#d66b63` | Error, failed, destructive, and offline state |
 | Negative text | `#f0aaa4` | Negative status copy on the ground |
 
-These are defined once in [`app/src/styles.css`](app/src/styles.css). The editor intentionally uses one appearance so its ground is
-always identical to the icon. Interface code should use the tokens.
+These are defined once in [`app/src/styles.css`](app/src/styles.css). Interface code should use the tokens.
+
+## Light palette
+
+Settings offers Auto, Light, and Dark. Dark is the table above and the default; Light is a
+sibling palette selected by `prefers-color-scheme` under Auto or by `data-theme="light"`. It keeps
+the blue-biased neutrals and darkens the accent and status hues so they hold contrast on a pale
+ground. The app icon keeps its deep-blue tile in both.
+
+| Token | Value |
+| --- | --- |
+| Ground | `#f7f9fc` |
+| Accent | `#2a66d9` |
+| Positive / text | `#2f8a57` / `#236b43` |
+| Caution / text | `#b57d12` / `#845906` |
+| Negative / text | `#c4473e` / `#9e2f28` |
 
 The rest of the palette in that file, including `--ink`, `--ink-soft`,
 `--ink-faint`, `--rule`, and `--raised`, is the neutral ramp. The greys carry a

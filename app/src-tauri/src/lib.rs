@@ -352,6 +352,52 @@ fn cascaded_position(
     Some(tauri::PhysicalPosition::new(x, y))
 }
 
+const SETTINGS_WINDOW: &str = "settings";
+const SETTINGS_MENU_ID: &str = "settings";
+
+/// Show the one app-wide Settings window, creating it on first use.
+///
+/// Settings apply to every document window, so there is never more than one;
+/// a second request only brings the existing window forward.
+#[tauri::command]
+fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager as _;
+    if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
+        let _ = window.unminimize();
+        window.show().map_err(|e| e.to_string())?;
+        return window.set_focus().map_err(|e| e.to_string());
+    }
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        SETTINGS_WINDOW,
+        tauri::WebviewUrl::App("settings.html".into()),
+    )
+    .title("Settings")
+    .inner_size(640.0, 720.0)
+    .min_inner_size(520.0, 480.0)
+    .build()
+    .map(|_| ())
+    .map_err(|e| e.to_string())
+}
+
+/// The platform's standard menu with Settings… (⌘,) after About.
+fn app_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
+    let menu = Menu::default(app)?;
+    if let Some(MenuItemKind::Submenu(app_submenu)) = menu.items()?.first() {
+        let settings = MenuItem::with_id(
+            app,
+            SETTINGS_MENU_ID,
+            "Settings…",
+            true,
+            Some("CmdOrCtrl+,"),
+        )?;
+        let separator = PredefinedMenuItem::separator(app)?;
+        app_submenu.insert_items(&[&separator, &settings], 1)?;
+    }
+    Ok(menu)
+}
+
 /// Open another window on the same daemon, optionally pinned to one document.
 ///
 /// Passing a document id is how New Document opens a genuinely separate
@@ -725,9 +771,18 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(daemon)
+        .menu(app_menu)
+        .on_menu_event(|app, event| {
+            if event.id() == SETTINGS_MENU_ID
+                && let Err(error) = open_settings(app.clone())
+            {
+                eprintln!("could not open Settings: {error}");
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             connection,
             new_window,
+            open_settings,
             import_markdown,
             export_markdown,
             document_wording_revision,

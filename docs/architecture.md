@@ -947,9 +947,10 @@ the daemon and CRDT remain the document authority. The stored path preference ca
 so every panel must describe current capabilities rather than treating the preference as access
 state.
 
-System sans throughout, sized and spaced for long-form writing. The editor and window use
-the fixed deep-blue `#0c1622` ground shared with the app icon. A compact, centered toolbar
-provides New, local zoom, persistent block style, font
+System sans throughout, sized and spaced for long-form writing. The dark appearance uses the
+deep-blue `#0c1622` ground shared with the app icon; a sibling light palette exists, and one
+app-wide Settings window (Proof of Thought → Settings…, ⌘,) offers Auto (follow the system),
+Light, and Dark. A compact, centered toolbar provides New, local zoom, persistent block style, font
 size, bold, italic, and link commands. Clicking linked text opens an action card with
 explicit open, copy, edit, and remove commands instead of navigating immediately. ⌘N
 creates a blank document in its own window, visibly cascaded from and leaving the current
@@ -970,8 +971,9 @@ Import and export are keyboard-only (⌘O, ⌘S) so the toolbar stays limited to
 Closing does not offer export because the CRDT store is authoritative and a Markdown copy
 must not be mistaken for a mirrored working file.
 
-**Cost:** the editor deliberately does not follow the system light or dark appearance. A future
-theme must revisit the editor and app-icon relationship rather than tinting either independently.
+**Cost:** in the light appearance the editor ground no longer matches the app-icon tile; the
+icon keeps its deep-blue ground in both. Every colour must come from a token defined for both
+palettes, and accent and status hues are darker in light so they hold contrast on a pale ground.
 Changing the ground or mark also requires keeping the style tokens, canonical `assets/orbit/`
 sources, generated desktop and web assets, and `DESIGN.md` in sync.
 

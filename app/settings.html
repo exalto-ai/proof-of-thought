@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <title>Settings</title>
+    <script type="module" src="/src/settings.ts" defer></script>
+  </head>
+  <body class="settings-page">
+    <main class="settings">
+      <h1 class="sr-only">Settings</h1>
+
+      <section class="settings-section" aria-labelledby="appearance-title">
+        <h2 id="appearance-title">Appearance</h2>
+        <div class="settings-group">
+          <div class="settings-row">
+            <span id="theme-label">Theme</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="theme-label">
+              <button type="button" role="radio" aria-checked="false" data-theme-choice="auto">Auto</button>
+              <button type="button" role="radio" aria-checked="false" data-theme-choice="light">Light</button>
+              <button type="button" role="radio" aria-checked="false" data-theme-choice="dark">Dark</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" hidden></div>
+  </body>
+</html>
