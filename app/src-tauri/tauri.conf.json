@@ -14,8 +14,8 @@
     "windows": [
       {
         "title": "Proof of Thought",
-        "width": 1040,
-        "height": 820,
+        "width": 1440,
+        "height": 880,
         "minWidth": 560,
         "minHeight": 400,
         "titleBarStyle": "Overlay",

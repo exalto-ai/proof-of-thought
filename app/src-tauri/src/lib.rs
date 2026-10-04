@@ -425,9 +425,9 @@ fn new_window(
     #[allow(unused_mut)]
     let mut builder = tauri::WebviewWindowBuilder::new(&app, &label, url)
         .title("Proof of Thought")
-        // Matches tauri.conf.json: the measure is 768px wide, and anything
-        // narrower than ~860 pushes the provenance rails on top of the text.
-        .inner_size(1040.0, 820.0)
+        // Matches tauri.conf.json: both sidebars at their default widths
+        // (240 + 360) beside the 768px measure and its padding.
+        .inner_size(1440.0, 880.0)
         .min_inner_size(560.0, 400.0)
         // Position the fully constructed native window using its real outer
         // dimensions, then reveal it. This avoids a centered-window flash and
