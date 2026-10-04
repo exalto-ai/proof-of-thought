@@ -19,6 +19,8 @@ use serde_json::Value;
 use sha2::{Digest as _, Sha256};
 use zeroize::{Zeroize as _, Zeroizing};
 
+use crate::secret_store;
+
 const AUTHORIZE_URL: &str = "https://auth.openai.com/api/accounts/authorize";
 const TOKEN_URL: &str = "https://auth.openai.com/api/accounts/oauth/token";
 const ISSUER: &str = "https://auth.openai.com";
@@ -33,15 +35,6 @@ const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const REFRESH_MARGIN_SECS: u64 = 120;
 const MAX_CALLBACK_BYTES: usize = 16 * 1024;
 const MAX_TOKEN_RESPONSE_BYTES: u64 = 64 * 1024;
-
-#[cfg(target_os = "macos")]
-const KEYCHAIN_SERVICE: &str = "ai.exalto.thought.chatgpt";
-#[cfg(target_os = "macos")]
-const CREDENTIALS_ACCOUNT: &str = "credentials";
-#[cfg(target_os = "macos")]
-const HOST_ID_ACCOUNT: &str = "host-id";
-#[cfg(target_os = "macos")]
-const ITEM_NOT_FOUND: i32 = -25_300;
 
 static CANCEL: AtomicBool = AtomicBool::new(false);
 
@@ -69,54 +62,14 @@ pub enum SignIn {
     Cancelled,
 }
 
-// ---------------------------------------------------------------- keychain
+// ---------------------------------------------------------------- storage
 
-#[cfg(target_os = "macos")]
-fn keychain_get(account: &str) -> Result<Option<Zeroizing<Vec<u8>>>, String> {
-    match security_framework::passwords::get_generic_password(KEYCHAIN_SERVICE, account) {
-        Ok(value) => Ok(Some(Zeroizing::new(value))),
-        Err(error) if error.code() == ITEM_NOT_FOUND => Ok(None),
-        Err(_) => Err("Could not access the Mac login Keychain.".into()),
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn keychain_set(account: &str, value: &[u8]) -> Result<(), String> {
-    security_framework::passwords::set_generic_password(KEYCHAIN_SERVICE, account, value)
-        .map_err(|_| "Could not save the ChatGPT sign-in in Keychain.".to_string())
-}
-
-#[cfg(target_os = "macos")]
-fn keychain_delete(account: &str) -> Result<(), String> {
-    match security_framework::passwords::delete_generic_password(KEYCHAIN_SERVICE, account) {
-        Ok(()) => Ok(()),
-        Err(error) if error.code() == ITEM_NOT_FOUND => Ok(()),
-        Err(_) => Err("Could not remove the ChatGPT sign-in from Keychain.".into()),
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-fn keychain_get(_: &str) -> Result<Option<Zeroizing<Vec<u8>>>, String> {
-    Err("Sign in with ChatGPT is available only in the macOS app.".into())
-}
-
-#[cfg(not(target_os = "macos"))]
-fn keychain_set(_: &str, _: &[u8]) -> Result<(), String> {
-    Err("Sign in with ChatGPT is available only in the macOS app.".into())
-}
-
-#[cfg(not(target_os = "macos"))]
-fn keychain_delete(_: &str) -> Result<(), String> {
-    Err("Sign in with ChatGPT is available only in the macOS app.".into())
-}
-
-#[cfg(target_os = "macos")]
-const ACCOUNTS: (&str, &str) = (CREDENTIALS_ACCOUNT, HOST_ID_ACCOUNT);
-#[cfg(not(target_os = "macos"))]
-const ACCOUNTS: (&str, &str) = ("credentials", "host-id");
+/// Names in the app's single Keychain item (see `secret_store`).
+const CREDENTIALS: &str = "chatgpt:credentials";
+const HOST_ID: &str = "chatgpt:host-id";
 
 fn load() -> Result<Option<Credentials>, String> {
-    let Some(bytes) = keychain_get(ACCOUNTS.0)? else {
+    let Some(bytes) = secret_store::get(CREDENTIALS)? else {
         return Ok(None);
     };
     serde_json::from_slice(&bytes)
@@ -129,7 +82,7 @@ fn save(credentials: &Credentials) -> Result<(), String> {
         serde_json::to_vec(credentials)
             .map_err(|_| "Could not save the ChatGPT sign-in.".to_string())?,
     );
-    keychain_set(ACCOUNTS.0, &bytes)
+    secret_store::set(CREDENTIALS, &bytes)
 }
 
 // ---------------------------------------------------------------- identifiers
@@ -165,14 +118,14 @@ pub fn format_host_id(bytes: [u8; 16]) -> String {
 /// The stable, opaque identifier for this install. Chosen once, before the
 /// first sign-in, and kept across sign-outs as OpenAI requires.
 fn host_id() -> Result<String, String> {
-    if let Some(bytes) = keychain_get(ACCOUNTS.1)?
+    if let Some(bytes) = secret_store::get(HOST_ID)?
         && let Ok(value) = std::str::from_utf8(&bytes)
         && value.starts_with("urn:uuid:")
     {
         return Ok(value.to_string());
     }
     let value = format_host_id(random_bytes::<16>()?);
-    keychain_set(ACCOUNTS.1, value.as_bytes())?;
+    secret_store::set(HOST_ID, value.as_bytes())?;
     Ok(value)
 }
 
@@ -509,7 +462,7 @@ pub fn account() -> Result<Option<String>, String> {
 
 /// Forget the sign-in. The host identifier stays, as OpenAI requires.
 pub fn sign_out() -> Result<(), String> {
-    keychain_delete(ACCOUNTS.0)
+    secret_store::delete(CREDENTIALS)
 }
 
 /// A current access token for Responses API requests, refreshed when close

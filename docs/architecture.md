@@ -510,6 +510,13 @@ Adding a key performs no provider request. The first chat request is the useful 
 **Cost:** setup cannot promise that a key, model, quota, or billing state will work later. The
 actual request reports that failure, without a separate catalog probe or validation ledger.
 
+**Amended:** every native secret (both provider keys, the ChatGPT sign-in, and its host
+identifier) lives in one login-Keychain item (`ai.exalto.thought` / `secrets`), read once per
+launch and kept in process memory, and written only when a secret changes. Four items re-read on
+every window focus produced a stream of access prompts whenever the code signature changed, as it
+does on every development build. **Cost:** a secret now sits in app memory for the process
+lifetime rather than only during each request, and changing one secret rewrites them all.
+
 ### AD-23: Visible chat persists locally and cannot edit
 
 The window shows a clear sharing disclosure, then sends the current document projection and visible

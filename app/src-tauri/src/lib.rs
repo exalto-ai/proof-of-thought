@@ -21,6 +21,7 @@ mod macos_secure_input;
 mod pro_chat;
 mod pro_provider;
 mod provider_credentials;
+mod secret_store;
 
 #[derive(serde::Serialize)]
 struct Connection {
