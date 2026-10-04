@@ -1007,8 +1007,12 @@ body.settings-page {
   font-weight: 640;
   letter-spacing: -0.02em;
   line-height: 1.25;
-  margin: 1.6em 0 0;
+  margin: 1.15em 0 0;
 }
+/* A heading belongs to what follows it: stacked headings and the first
+   paragraph under one sit close, and only a new section opens up space. */
+.tiptap :is(h1, h2, h3) + * { margin-top: 0.45em; }
+.tiptap :is(h1, h2, h3) + :is(h1, h2, h3) { margin-top: 0.5em; }
 .tiptap > h1:first-child,
 .tiptap > h2:first-child,
 .tiptap > h3:first-child { margin-top: 0.2em; }
