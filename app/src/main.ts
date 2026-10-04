@@ -35,7 +35,7 @@ import {
   type SuggestionReviewController,
 } from "./suggestions";
 import { installToast, oneLine } from "./notices";
-import { isTauri, nativeWindow } from "./tauri";
+import { isTauri, nativeAppearance, nativeWindow } from "./tauri";
 
 type Connection = {
   sync_url: string;
@@ -82,7 +82,7 @@ let closingAfterAutosave = false;
 const notify = installToast(els.toast);
 const reason = (error: unknown) => oneLine(error, "unknown error", 160);
 
-installTheme(safeLocalStorage(), nativeWindow());
+installTheme(safeLocalStorage(), nativeAppearance());
 installToolbarPosition(safeLocalStorage());
 
 const aiSupport = installAiSupport(document, {

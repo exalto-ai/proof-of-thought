@@ -36,12 +36,12 @@ import {
 } from "./toolbar-position";
 import { required } from "./dom";
 import { installToast, oneLine } from "./notices";
-import { isTauri, nativeWindow as getNativeWindow } from "./tauri";
+import { isTauri, nativeAppearance } from "./tauri";
 
 type Connection = { mcp_url: string; token: string; stdio_command: string };
 
 const storage = safeLocalStorage();
-const nativeWindow = getNativeWindow();
+const appearance = nativeAppearance();
 const notify = installToast(required<HTMLElement>(document, "#toast", "settings"));
 const reason = (error: unknown) => oneLine(error, "unknown error");
 
@@ -136,7 +136,7 @@ function installChoice<T extends string>(
   window.addEventListener("storage", render);
 }
 
-installTheme(storage, nativeWindow);
+installTheme(storage, appearance);
 installChoice<ThemePreference>(
   "data-theme-choice",
   isThemePreference,
@@ -145,7 +145,7 @@ installChoice<ThemePreference>(
     if (!writeTheme(storage, theme)) {
       notify("The theme changed, but could not be saved for next launch.", "error");
     }
-    applyTheme(document.documentElement, theme, nativeWindow);
+    applyTheme(document.documentElement, theme, appearance);
   },
 );
 

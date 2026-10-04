@@ -15,6 +15,7 @@ use std::{
 use tauri_plugin_dialog::DialogExt;
 use thoughtd::discovery::{self, Daemon};
 
+mod appearance;
 mod chatgpt_account;
 #[cfg(target_os = "macos")]
 mod macos_secure_input;
@@ -858,6 +859,7 @@ pub fn run() {
             connection,
             new_window,
             open_settings,
+            appearance::apply_theme,
             import_markdown,
             export_markdown,
             document_wording_revision,

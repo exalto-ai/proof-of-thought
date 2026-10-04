@@ -13,7 +13,6 @@
     "core:window:allow-start-dragging",
     "core:webview:allow-create-webview-window",
     "core:window:allow-set-title",
-    "core:window:allow-destroy",
-    "core:window:allow-set-theme"
+    "core:window:allow-destroy"
   ]
 }

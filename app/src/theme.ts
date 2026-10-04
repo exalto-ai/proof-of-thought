@@ -31,8 +31,8 @@ export function writeTheme(storage: Storage | null, theme: ThemePreference): boo
 
 /**
  * Pin `data-theme` for Light and Dark; leave it unset for Auto so the
- * stylesheet's `prefers-color-scheme` rule decides. The native window follows
- * too, which keeps the traffic lights and vibrancy matched to the page.
+ * stylesheet's `prefers-color-scheme` rule decides. The native appearance
+ * follows too, for the app and every window at once, so title bars match.
  */
 export function applyTheme(
   root: HTMLElement,
