@@ -7,6 +7,15 @@ export function isTauri(): boolean {
   );
 }
 
+/**
+ * Whether this window draws the native macOS sidebar material behind a
+ * transparent page. Document windows do (see tauri.conf.json); the page then
+ * leaves its sidebars and title strip clear to show it.
+ */
+export function hasNativeSidebarMaterial(): boolean {
+  return isTauri() && /Mac/.test(navigator.userAgent);
+}
+
 /** This page's native window, or null when there is none to address. */
 export function nativeWindow() {
   return isTauri() ? getCurrentWindow() : null;

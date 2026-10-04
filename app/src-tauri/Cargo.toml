@@ -22,7 +22,9 @@ thoughtd = { path = "../../crates/thoughtd" }
 thought-markdown = { path = "../../crates/thought-markdown" }
 thought-schema = { path = "../../crates/thought-schema" }
 thought-store = { path = "../../crates/thought-store" }
-tauri = { version = "2", features = [] }
+# macos-private-api: transparent windows, so sidebars can use the native
+# sidebar material. Developer ID distribution allows it; the Mac App Store would not.
+tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }

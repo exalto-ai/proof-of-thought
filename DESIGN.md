@@ -24,6 +24,12 @@ only literal colour outside them is white text on a person's presence colour. Th
 is written twice there, for Auto and for pinned Light, and `theme-palette.test.ts` keeps the two
 copies identical and in step with the dark token set.
 
+## Native material
+
+On macOS the title strip and both sidebars are clear over the system sidebar material rather
+than painted with a token; the editor keeps its ground. Text and controls there still use the
+tokens, which the material is designed to carry in both appearances.
+
 ## Light palette
 
 Settings offers Auto, Light, and Dark. Dark is the table above and the default; Light is a

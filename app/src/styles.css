@@ -86,6 +86,14 @@
   --shadow-float: rgba(15, 27, 42, 0.12);
 }
 
+/* Native sidebar material (macOS document windows). The window is transparent
+   over the system sidebar effect: the title strip and side panels let it show
+   through, while the writing surface keeps its own opaque ground. */
+:root.native-material,
+:root.native-material body { background: transparent; }
+:root.native-material .page { background: var(--paper); }
+:root.native-material .side-panel { background: transparent; }
+
 .sr-only {
   position: absolute;
   width: 1px;

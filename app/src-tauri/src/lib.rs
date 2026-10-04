@@ -433,9 +433,19 @@ fn new_window(
         .visible(false);
     #[cfg(target_os = "macos")]
     {
+        use tauri::window::{Effect, EffectState, EffectsBuilder};
+        // Matches tauri.conf.json: a transparent window behind the native
+        // sidebar material, which the page shows through its sidebars.
         builder = builder
             .title_bar_style(tauri::TitleBarStyle::Overlay)
-            .hidden_title(true);
+            .hidden_title(true)
+            .transparent(true)
+            .effects(
+                EffectsBuilder::new()
+                    .effect(Effect::Sidebar)
+                    .state(EffectState::FollowsWindowActiveState)
+                    .build(),
+            );
     }
     let child = builder.build().map_err(|e| e.to_string())?;
     if let Ok(target_size) = child.outer_size()
