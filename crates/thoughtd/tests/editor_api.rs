@@ -30,70 +30,91 @@ fn window_lifecycle_operations_do_not_self_assert_over_mcp() {
     assert_eq!(trashed["documents"][0]["doc_id"], doc_id);
 }
 
-#[test]
-fn provider_chat_can_create_only_a_pending_reported_suggestion() {
-    let daemon = Daemon::start();
-    let created = daemon.editor_post(
-        "/editor/documents",
-        serde_json::json!({ "title": "Draft", "markdown": "Original text" }),
-    );
-    let doc_id = created["doc_id"].as_str().unwrap();
-    let lineage = daemon
-        .connect()
-        .call("document_lineage", serde_json::json!({ "doc_id": doc_id }));
-    let wording_revision = lineage["current_wording_revision"].as_str().unwrap();
-
-    let outcome = daemon.editor_post(
+fn chat_edit(
+    daemon: &Daemon,
+    doc_id: &str,
+    request_id: &str,
+    provider: &str,
+    change: serde_json::Value,
+) -> serde_json::Value {
+    daemon.editor_post(
         &format!("/editor/documents/{doc_id}/suggestions/pro-chat"),
         serde_json::json!({
-            "request_id": "chat-request-1",
-            "provider": "openai",
+            "request_id": request_id,
+            "provider": provider,
             "requested_model": "gpt-test",
             "reported_model": "gpt-test-2026",
-            "assistant_text": "Suggested ending",
-            "wording_revision": wording_revision,
-            "after": { "kind": "end" }
+            "change": change,
         }),
-    );
-
-    assert_eq!(outcome["suggestion"]["state"], "pending");
-    assert_eq!(outcome["suggestion"]["patch"]["kind"], "insert_blocks");
-    assert_eq!(
-        outcome["suggestion"]["proposer"]["label"],
-        "OpenAI chat (reported)"
-    );
-    let unchanged = daemon.read_document(doc_id);
-    assert_eq!(unchanged["markdown"], "Original text");
+    )
 }
 
 #[test]
-fn chatgpt_plan_chat_creates_a_reported_suggestion_too() {
+fn provider_chat_can_create_only_pending_reported_suggestions() {
     let daemon = Daemon::start();
     let created = daemon.editor_post(
         "/editor/documents",
-        serde_json::json!({ "title": "Draft", "markdown": "Original text" }),
+        serde_json::json!({ "title": "Draft", "markdown": "# Title\n\nOriginal text" }),
     );
     let doc_id = created["doc_id"].as_str().unwrap();
-    let lineage = daemon
-        .connect()
-        .call("document_lineage", serde_json::json!({ "doc_id": doc_id }));
-    let wording_revision = lineage["current_wording_revision"].as_str().unwrap();
+    let block_id = daemon.connect().read_document(doc_id)["blocks"][1]["block_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
-    let outcome = daemon.editor_post(
-        &format!("/editor/documents/{doc_id}/suggestions/pro-chat"),
+    let inserted = chat_edit(
+        &daemon,
+        doc_id,
+        "chat-request-1.0",
+        "openai",
         serde_json::json!({
-            "request_id": "chat-request-plan",
-            "provider": "chatgpt",
-            "requested_model": "gpt-plan",
-            "assistant_text": "A haiku",
-            "wording_revision": wording_revision,
-            "after": { "kind": "end" }
+            "kind": "insert_blocks",
+            "after": { "kind": "end" },
+            "markdown": "Suggested ending"
         }),
     );
-
-    assert_eq!(outcome["suggestion"]["state"], "pending");
+    assert_eq!(inserted["suggestion"]["state"], "pending");
+    assert_eq!(inserted["suggestion"]["patch"]["kind"], "insert_blocks");
     assert_eq!(
-        outcome["suggestion"]["proposer"]["label"],
+        inserted["suggestion"]["proposer"]["label"],
+        "OpenAI chat (reported)"
+    );
+
+    let replaced = chat_edit(
+        &daemon,
+        doc_id,
+        "chat-request-1.1",
+        "chatgpt",
+        serde_json::json!({
+            "kind": "replace_block",
+            "block_id": block_id,
+            "markdown": "Better text",
+            "original": "Original text"
+        }),
+    );
+    assert_eq!(replaced["suggestion"]["patch"]["kind"], "replace_block");
+    assert_eq!(
+        replaced["suggestion"]["proposer"]["label"],
         "ChatGPT chat (reported)"
     );
+    assert_eq!(
+        daemon.read_document(doc_id)["markdown"],
+        "# Title\n\nOriginal text"
+    );
+
+    // An edit written against wording the block no longer has is refused.
+    let stale = daemon.editor_post_status(
+        &format!("/editor/documents/{doc_id}/suggestions/pro-chat"),
+        serde_json::json!({
+            "request_id": "chat-request-1.2",
+            "provider": "anthropic",
+            "requested_model": "claude-test",
+            "change": {
+                "kind": "delete_block",
+                "block_id": block_id,
+                "original": "Different text"
+            }
+        }),
+    );
+    assert_eq!(stale, 409);
 }

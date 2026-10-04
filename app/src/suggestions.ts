@@ -115,6 +115,22 @@ function blockPositions(editor: Editor, ydoc: Y.Doc): Map<string, BlockPosition>
   );
 }
 
+/**
+ * Each of the editor's top-level blocks' CRDT id, in order, or null for a
+ * block the CRDT does not hold yet (such as the trailing empty paragraph).
+ */
+export function topLevelBlockIds(editor: Editor, ydoc: Y.Doc): Array<string | null> {
+  const ids: Array<string | null> = Array.from({ length: editor.state.doc.childCount }, () => null);
+  const byOffset = new Map<number, string>();
+  for (const [id, { from }] of blockPositions(editor, ydoc)) byOffset.set(from, id);
+  let index = 0;
+  editor.state.doc.forEach((_node, offset) => {
+    ids[index] = byOffset.get(offset) ?? null;
+    index += 1;
+  });
+  return ids;
+}
+
 /** Place an inserted suggestion at the current block boundary. */
 export function suggestionPositionAtSelection(
   editor: Editor,

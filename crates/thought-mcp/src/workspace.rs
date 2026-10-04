@@ -590,6 +590,11 @@ impl Workspace {
         })
     }
 
+    /// One block as Markdown, the projection agents read and write.
+    pub fn block_markdown(&self, doc_id: &str, block_id: &str) -> Result<String, WorkspaceError> {
+        self.with(|inner| block_markdown(inner.doc(doc_id)?, block_id))
+    }
+
     pub fn list_suggestions(&self, doc_id: &str) -> Result<SuggestionList, WorkspaceError> {
         self.with(|inner| {
             let doc = inner.doc(doc_id)?;

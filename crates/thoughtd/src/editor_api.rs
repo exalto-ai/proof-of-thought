@@ -47,9 +47,27 @@ struct CreateChatSuggestion {
     requested_model: String,
     #[serde(default)]
     reported_model: Option<String>,
-    assistant_text: String,
-    wording_revision: String,
-    after: ChatSuggestionPosition,
+    change: ChatChange,
+}
+
+/// One edit a chat model made with its tools. Edits to an existing block
+/// carry that block's Markdown as the model saw it.
+#[derive(serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum ChatChange {
+    InsertBlocks {
+        after: ChatSuggestionPosition,
+        markdown: String,
+    },
+    ReplaceBlock {
+        block_id: String,
+        markdown: String,
+        original: String,
+    },
+    DeleteBlock {
+        block_id: String,
+        original: String,
+    },
 }
 
 #[derive(serde::Deserialize)]
@@ -178,49 +196,69 @@ async fn create_chat_suggestion(
     Path(doc_id): Path<String>,
     Json(request): Json<CreateChatSuggestion>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    const MAX_RESPONSE_BYTES: usize = 256 * 1024;
-    if request.assistant_text.trim().is_empty()
-        || request.assistant_text.len() > MAX_RESPONSE_BYTES
-        || request.assistant_text.contains('\0')
-    {
+    const MAX_MARKDOWN_BYTES: usize = 256 * 1024;
+    let markdown = match &request.change {
+        ChatChange::InsertBlocks { markdown, .. } | ChatChange::ReplaceBlock { markdown, .. } => {
+            Some(markdown)
+        }
+        ChatChange::DeleteBlock { .. } => None,
+    };
+    if markdown.is_some_and(|markdown| {
+        markdown.trim().is_empty() || markdown.len() > MAX_MARKDOWN_BYTES || markdown.contains('\0')
+    }) {
         return Err((
             StatusCode::PAYLOAD_TOO_LARGE,
-            "The chat response is empty or too large to suggest.".into(),
+            "The chat edit is empty or too large to suggest.".into(),
         ));
     }
-    for value in [
-        request.requested_model.as_str(),
-        request.wording_revision.as_str(),
-    ] {
+    for value in
+        std::iter::once(request.requested_model.as_str()).chain(request.reported_model.as_deref())
+    {
         if value.is_empty() || value.len() > 160 || value.chars().any(char::is_control) {
             return Err((
                 StatusCode::BAD_REQUEST,
-                "The chat suggestion contains invalid metadata.".into(),
+                "The chat suggestion contains invalid model metadata.".into(),
             ));
         }
     }
-    if request.reported_model.as_deref().is_some_and(|value| {
-        value.is_empty() || value.len() > 160 || value.chars().any(char::is_control)
-    }) {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "The chat suggestion contains invalid model metadata.".into(),
-        ));
-    }
 
-    let lineage = state.workspace.document_lineage(&doc_id).map_err(failed)?;
-    if lineage.current_wording_revision != request.wording_revision {
-        return Err((
+    // The model saw one version of the block it edits. If the block has since
+    // changed or gone, the edit no longer means what it did.
+    let changed = || {
+        (
             StatusCode::CONFLICT,
-            "The note changed after this reply was written. Ask again to add an up-to-date version.".into(),
-        ));
-    }
-    let current = state.workspace.read_document(&doc_id).map_err(failed)?;
-    let after = match request.after {
-        ChatSuggestionPosition::Start => Some("start".to_string()),
-        ChatSuggestionPosition::End => None,
-        ChatSuggestionPosition::Block { block_id } => Some(block_id),
+            "That part of the note changed after this reply was written. Ask again.".to_string(),
+        )
     };
+    if let ChatChange::ReplaceBlock {
+        block_id, original, ..
+    }
+    | ChatChange::DeleteBlock { block_id, original } = &request.change
+    {
+        let current = state
+            .workspace
+            .block_markdown(&doc_id, block_id)
+            .map_err(|_| changed())?;
+        if current.trim_end() != original.trim_end() {
+            return Err(changed());
+        }
+    }
+    let change = match request.change {
+        ChatChange::InsertBlocks { after, markdown } => SuggestedChange::InsertBlocks {
+            after: Some(match after {
+                ChatSuggestionPosition::Start => "start".to_string(),
+                ChatSuggestionPosition::End => "end".to_string(),
+                ChatSuggestionPosition::Block { block_id } => block_id,
+            }),
+            markdown,
+        },
+        ChatChange::ReplaceBlock {
+            block_id, markdown, ..
+        } => SuggestedChange::ReplaceBlock { block_id, markdown },
+        ChatChange::DeleteBlock { block_id, .. } => SuggestedChange::DeleteBlock { block_id },
+    };
+
+    let current = state.workspace.read_document(&doc_id).map_err(failed)?;
     let (provider_id, provider_label) = match request.provider {
         ChatProvider::Openai => ("openai", "OpenAI"),
         ChatProvider::Anthropic => ("anthropic", "Anthropic"),
@@ -247,17 +285,17 @@ async fn create_chat_suggestion(
             &doc_id,
             &request.request_id,
             &current.content_revision,
-            &SuggestedChange::InsertBlocks {
-                after,
-                markdown: request.assistant_text,
-            },
+            &change,
             None,
             Some(model),
             &connection_id,
             &actor,
             &context,
         )
-        .map_err(failed)?;
+        .map_err(|error| match error {
+            thought_mcp::WorkspaceError::Block(_) => changed(),
+            other => failed(other),
+        })?;
     Ok(Json(serde_json::to_value(outcome).map_err(failed)?))
 }
 

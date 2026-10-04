@@ -24,8 +24,22 @@ export type SendChatRequest = {
   disclosure_version: 2;
 };
 
+/** Where an insertion goes, by index into the note's top-level blocks as sent. */
+export type EditAnchor = { kind: "start" } | { kind: "end" } | { kind: "block"; block: number };
+
+/**
+ * One edit the model made with its tools. `block` indexes the note's
+ * top-level blocks as sent; `original` is that block's Markdown as the model
+ * saw it.
+ */
+export type ChatEdit =
+  | { kind: "replace_block"; block: number; markdown: string; original: string }
+  | { kind: "insert_blocks"; after: EditAnchor; markdown: string }
+  | { kind: "delete_block"; block: number; original: string };
+
 export type SendChatResponse = {
   text: string;
+  edits: ChatEdit[];
   provider: ProProvider;
   requested_model: string;
   reported_model: string | null;

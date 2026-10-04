@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChatSuggestionInput } from "./editor-api";
 import type { ProChatBridge, SendChatRequest } from "./pro-chat-bridge";
 import { installProChat, type ProChatDocument } from "./pro-chat";
 
@@ -59,7 +58,7 @@ function chatDocument(id = "private-document-id", title = "Draft"): ProChatDocum
     id,
     title,
     snapshot: () => ({ type: "doc", content: [] }),
-    suggestionPosition: () => ({ kind: "end" }),
+    blockIds: () => [],
     waitUntilSaved: async () => true,
     selectedText: () => null,
   };
@@ -171,7 +170,6 @@ describe("built-in chat", () => {
 
   it("shares the current snapshot with the current disclosure contract", async () => {
     let sent: SendChatRequest | null = null;
-    let suggested: ChatSuggestionInput | null = null;
     const bridge: ProChatBridge = {
       models: vi.fn().mockResolvedValue({
         provider: "openai",
@@ -181,6 +179,7 @@ describe("built-in chat", () => {
         sent = request;
         return {
           text: "A clearer ending",
+          edits: [],
           provider: "openai",
           requested_model: "gpt-test",
           reported_model: "gpt-test-2026",
@@ -189,22 +188,9 @@ describe("built-in chat", () => {
         };
       }),
     };
-    const controller = installChat({
-      bridge,
-      createRequestId: () => "suggestion-one",
-      suggestResponse: vi.fn().mockImplementation(async (input: ChatSuggestionInput) => {
-        suggested = input;
-      }),
-    });
+    const controller = installChat({ bridge, createRequestId: () => "suggestion-one" });
     controller.setActive(true);
-    controller.setDocument({
-      id: "private-document-id",
-      title: "Draft",
-      snapshot: () => ({ type: "doc", content: [] }),
-      suggestionPosition: () => ({ kind: "end" }),
-      waitUntilSaved: async () => true,
-      selectedText: () => "Selected line",
-    });
+    controller.setDocument({ ...chatDocument(), selectedText: () => "Selected line" });
 
     await vi.waitFor(() => {
       expect(bridge.models).toHaveBeenCalledWith("openai");
@@ -238,91 +224,70 @@ describe("built-in chat", () => {
       expect(document.querySelector("#pro-chat-messages")?.textContent)
         .toContain("A clearer ending");
     });
-    document.querySelector<HTMLButtonElement>(".pro-chat-suggest")!.click();
-    await vi.waitFor(() => expect(suggested).not.toBeNull());
-    expect(suggested).toMatchObject({
-      documentId: "private-document-id",
-      requestId: "suggestion-one",
-      provider: "openai",
-      assistantText: "A clearer ending",
-      wordingRevision: "revision-1",
-      after: { kind: "end" },
-    });
+    expect(document.querySelector(".pro-chat-change")).toBeNull();
     controller.destroy();
   });
 
-  it("persists a suggestion request ID before the call and reuses it after restart", async () => {
+  it("turns a reply's edits into suggestions the chat links to", async () => {
     const bridge = chatBridge({
       send: vi.fn().mockResolvedValue({
-        text: "A clearer ending",
+        text: "",
+        edits: [
+          { kind: "replace_block", block: 0, markdown: "## A firmer *ending*", original: "Ending" },
+          { kind: "delete_block", block: 0, original: "Ending" },
+          // The trailing paragraph is not saved yet: replacing it adds instead.
+          { kind: "replace_block", block: 1, markdown: "Coda", original: "" },
+        ],
         provider: "openai",
         requested_model: "gpt-test",
-        reported_model: "gpt-test-2026",
+        reported_model: null,
         wording_revision: "revision-1",
         complete: true,
       }),
     });
-    const createRequestId = vi.fn()
-      .mockReturnValueOnce("suggestion-one")
-      .mockReturnValueOnce("suggestion-two");
-    const suggestResponse = vi.fn()
-      .mockImplementationOnce(async () => {
-        const saved = storage.getItem(
-          "thought.pro-chat.v1.private-document-id",
-        );
-        expect(saved).toContain('"suggestionRequestId":"suggestion-one"');
-        throw new Error("response lost");
-      })
-      .mockResolvedValueOnce(undefined);
+    const suggestEdit = vi.fn()
+      .mockResolvedValueOnce({ suggestion: { suggestion_id: "pro-chat:openai:one.0" } })
+      .mockRejectedValueOnce(new Error("That part of the note changed."))
+      .mockResolvedValueOnce({ suggestion: { suggestion_id: "pro-chat:openai:one.2" } });
+    const focusSuggestion = vi.fn();
     let controller = installChat({
       bridge,
-      createRequestId,
-      suggestResponse,
+      createRequestId: () => "one",
+      suggestEdit,
+      focusSuggestion,
     });
     controller.setActive(true);
-    controller.setDocument(chatDocument());
+    controller.setDocument({ ...chatDocument(), blockIds: () => ["1:0", null] });
     await chooseOpenAi(bridge);
-    compose("Improve the ending");
+    compose("Tighten the ending");
     submitChat();
-    await vi.waitFor(() => {
-      expect(document.querySelector("#pro-chat-messages")?.textContent)
-        .toContain("A clearer ending");
-    });
 
-    document.querySelector<HTMLButtonElement>(".pro-chat-suggest")!.click();
-    await vi.waitFor(() => {
-      expect(document.querySelector("#pro-chat-error")?.textContent)
-        .toContain("response lost");
-    });
+    await vi.waitFor(() => expect(document.querySelectorAll(".pro-chat-change")).toHaveLength(2));
+    expect(suggestEdit.mock.calls.map(([input]) => [input.requestId, input.change])).toEqual([
+      ["one.0", {
+        kind: "replace_block",
+        block_id: "1:0",
+        markdown: "## A firmer *ending*",
+        original: "Ending",
+      }],
+      ["one.1", { kind: "delete_block", block_id: "1:0", original: "Ending" }],
+      ["one.2", { kind: "insert_blocks", after: { kind: "block", block_id: "1:0" }, markdown: "Coda" }],
+    ]);
+    expect(document.querySelector("#pro-chat-error")?.textContent)
+      .toContain("Could not suggest an edit: That part of the note changed.");
+    const links = [...document.querySelectorAll<HTMLButtonElement>(".pro-chat-change")];
+    expect(links.map((link) => link.textContent)).toEqual(["Edit: A firmer ending", "Edit: Coda"]);
+    expect(document.querySelector("#pro-chat-messages")?.textContent).toContain("Suggested 2 edits.");
+    links[1].click();
+    expect(focusSuggestion).toHaveBeenCalledWith("pro-chat:openai:one.2");
 
-    const saved = JSON.parse(storage.getItem(
-      "thought.pro-chat.v1.private-document-id",
-    )!);
-    expect(saved.messages[1].text).toBe("A clearer ending");
-    expect(saved.messages[1].response).not.toHaveProperty("text");
+    // The links survive a restart.
     controller.destroy();
     document.body.innerHTML = markup();
-    controller = installChat({
-      bridge,
-      createRequestId,
-      suggestResponse,
-    });
+    controller = installChat({ bridge, suggestEdit, focusSuggestion });
     controller.setDocument(chatDocument());
-    expect(document.querySelector("#pro-chat-messages")?.textContent)
-      .toContain("A clearer ending");
-    controller.setActive(true);
-    await vi.waitFor(() => {
-      expect(document.querySelector<HTMLSelectElement>("#pro-chat-model")!.value)
-        .toBe("openai:gpt-test");
-    });
-    document.querySelector<HTMLButtonElement>(".pro-chat-suggest")!.click();
-    await vi.waitFor(() => expect(suggestResponse).toHaveBeenCalledTimes(2));
-
-    expect(suggestResponse.mock.calls.map(([request]) => request.requestId))
-      .toEqual(["suggestion-one", "suggestion-one"]);
-    expect(createRequestId).toHaveBeenCalledTimes(1);
-    expect(document.querySelector("#pro-chat-messages")?.textContent)
-      .toContain("Suggested");
+    expect([...document.querySelectorAll(".pro-chat-change")].map((link) => link.textContent))
+      .toEqual(["Edit: A firmer ending", "Edit: Coda"]);
     controller.destroy();
   });
 
@@ -717,7 +682,6 @@ describe("built-in chat", () => {
     const models = deferred<Awaited<ReturnType<ProChatBridge["models"]>>>();
     const controller = installChat({
       bridge: chatBridge({ models: vi.fn().mockReturnValue(models.promise) }),
-      suggestResponse: vi.fn(),
     });
     controller.setDocument(chatDocument());
     controller.setActive(true);
@@ -725,8 +689,6 @@ describe("built-in chat", () => {
       "aria-busy",
     )).toBe("true"));
     expect(document.querySelector<HTMLButtonElement>("#pro-chat-new")!.disabled).toBe(true);
-    expect(document.querySelector<HTMLButtonElement>(".pro-chat-suggest")!.disabled)
-      .toBe(true);
 
     models.resolve({
       provider: "openai",
@@ -736,8 +698,6 @@ describe("built-in chat", () => {
       "aria-busy",
     )).toBe("false"));
     expect(document.querySelector<HTMLButtonElement>("#pro-chat-new")!.disabled).toBe(false);
-    expect(document.querySelector<HTMLButtonElement>(".pro-chat-suggest")!.disabled)
-      .toBe(false);
     controller.destroy();
   });
 

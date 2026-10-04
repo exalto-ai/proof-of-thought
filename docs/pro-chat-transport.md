@@ -7,7 +7,7 @@ optional inline files, and a versioned sharing disclosure. It never receives a k
 
 Opening chat may read the selected provider's model catalog. This state is not presented as proof
 that a later generation request will work. Sending validates and projects the current editor tree
-to bounded Markdown, then calls a fixed OpenAI Responses or Anthropic Messages endpoint with
+to bounded Markdown, one numbered entry per top-level block, then calls a fixed OpenAI Responses or Anthropic Messages endpoint with
 redirects disabled. OpenAI requests keep `store: false`. Neither provider's Files API is used.
 
 Provider default omits an effort setting. Low, Medium, and High map to OpenAI
@@ -16,8 +16,9 @@ or verified reasoning. Hidden reasoning blocks are never returned to the WebView
 
 The transport remains non-streaming and has no native transcript database, provider-side
 conversation ID, file lock, Stop command, or hidden reasoning surface. It returns bounded visible
-text, requested and reported model labels, the wording revision sent, and whether the provider
-reported a complete response.
+text, the edits the model made with its tools (see [`pro-reviewable-suggestions.md`](pro-reviewable-suggestions.md)),
+requested and reported model labels, the wording revision sent, and whether the provider reported
+a complete response.
 
 Visible history persists per document in bounded WebView local storage. Storage is local-only,
 fail-soft convenience state. It contains no draft, focus, hidden reasoning, attachment payloads,

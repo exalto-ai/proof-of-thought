@@ -1,18 +1,21 @@
 # Reviewable chat suggestions
 
-A complete built-in chat response has one optional action: **Add to Note**.
+Built-in chat changes the note only through three edit tools offered to the model:
+`replace_block`, `insert_blocks`, and `delete_block`. The note is sent as numbered blocks (`b1`,
+`b2`, …), and the tools address those numbers. The native side resolves each call to a block
+index and the block's Markdown as sent. A call it cannot read is dropped. There is one model turn
+per message: tool calls are the answer, and no results are sent back.
 
-The action waits for current editor changes to save, then creates a pending block insertion at the
-current caret or selection block. Current wording does not change until the person accepts it.
-Reject changes no wording.
-
-The daemon compares the response’s wording revision with the current document before storing the
-proposal. A response generated for older wording must be regenerated. Provider and model labels
-remain reported claims.
+The window waits for current editor changes to save, maps each index to the block's stable id,
+and sends each edit to the daemon as its own pending suggestion. Edits to an existing block carry
+that block's Markdown as the model saw it. If the block has changed or gone since, the daemon
+refuses that one edit, and the others still land. The reply lists each suggestion it made, and
+clicking one shows it in the note with Accept and Reject. Current wording does not change until
+the person accepts. Provider and model labels remain reported claims.
 
 This reuses the editor API, daemon bearer, suggestion store, and review UI. It adds no provider
-credential, native transcript, direct-write route, selection replacement, or second capability
-system. Only visible assistant text crosses into the suggestion request. Requested thinking,
-attached files, filenames, and local chat history do not enter the daemon or proof. If a response
-quotes or transforms a file, accepted editor wording remains reported AI output rather than a claim
-about authorship or provenance for that file.
+credential, native transcript, direct-write route, or second capability system. Only the edits
+cross into the suggestion request. Requested thinking, attached files, filenames, and local chat
+history do not enter the daemon or proof. If an edit quotes or transforms a file, accepted
+wording remains reported AI output rather than a claim about authorship or provenance for that
+file.

@@ -11,15 +11,19 @@ import type {
   SuggestionPosition,
 } from "./suggestions";
 
+/** A chat edit addressed to the note's blocks by id. */
+export type ChatChange =
+  | { kind: "insert_blocks"; after: SuggestionPosition; markdown: string }
+  | { kind: "replace_block"; block_id: string; markdown: string; original: string }
+  | { kind: "delete_block"; block_id: string; original: string };
+
 export type ChatSuggestionInput = {
   documentId: string;
   requestId: string;
   provider: ProProvider;
   requestedModel: string;
   reportedModel: string | null;
-  assistantText: string;
-  wordingRevision: string;
-  after: SuggestionPosition;
+  change: ChatChange;
 };
 
 export class EditorApi implements ReviewerApi {
@@ -62,9 +66,7 @@ export class EditorApi implements ReviewerApi {
         provider: input.provider,
         requested_model: input.requestedModel,
         reported_model: input.reportedModel,
-        assistant_text: input.assistantText,
-        wording_revision: input.wordingRevision,
-        after: input.after,
+        change: input.change,
       },
     );
   }

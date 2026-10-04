@@ -31,7 +31,7 @@ import { installTheme } from "./theme";
 import { installToolbarPosition } from "./toolbar-position";
 import {
   installSuggestionReview,
-  suggestionPositionAtSelection,
+  topLevelBlockIds,
   type SuggestionReviewController,
 } from "./suggestions";
 import { installToast, oneLine } from "./notices";
@@ -88,7 +88,8 @@ installToolbarPosition(safeLocalStorage());
 const aiSupport = installAiSupport(document, {
   providerBridge: isTauri() ? tauriProProviderBridge() : null,
   chatBridge: isTauri() ? tauriProChatBridge() : null,
-  suggestChatResponse: (input) => editorApi.proposeChatSuggestion(input),
+  suggestChatEdit: (input) => editorApi.proposeChatSuggestion(input),
+  focusSuggestion: (suggestionId) => void focusSuggestion(suggestionId),
   openSettings: () =>
     invoke<void>("open_settings").catch((error) =>
       notify(`Could not open Settings: ${reason(error)}`, "error"),
@@ -223,13 +224,23 @@ function refreshTitle(editor: Editor) {
       id: openDocId,
       title,
       snapshot: () => editor.getJSON(),
-      suggestionPosition: () => suggestionPositionAtSelection(editor, current.doc),
+      blockIds: () => topLevelBlockIds(editor, current.doc),
       waitUntilSaved: () => current.provider.waitUntilSaved(),
       selectedText: () => {
         const { from, to } = editor.state.selection;
         return from === to ? null : editor.state.doc.textBetween(from, to, "\n", "\n");
       },
     });
+  }
+}
+
+/** Show a suggestion a chat reply links to, loading it first if it is new. */
+async function focusSuggestion(suggestionId: string) {
+  const suggestions = open?.suggestions;
+  if (!suggestions || suggestions.focus(suggestionId)) return;
+  await suggestions.refresh();
+  if (open?.suggestions === suggestions && !suggestions.focus(suggestionId)) {
+    notify("That suggestion was already accepted or rejected.");
   }
 }
 

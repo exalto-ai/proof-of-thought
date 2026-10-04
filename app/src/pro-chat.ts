@@ -1,12 +1,13 @@
 import type {
   ChatAttachment,
+  ChatEdit,
   ChatMessage,
   ProChatBridge,
   ProviderModel,
   SendChatResponse,
   ThinkingLevel,
 } from "./pro-chat-bridge";
-import type { ChatSuggestionInput } from "./editor-api";
+import type { ChatChange, ChatSuggestionInput } from "./editor-api";
 import type { ProProvider } from "./pro-provider-bridge";
 import type { SuggestionPosition } from "./suggestions";
 import { required } from "./dom";
@@ -35,6 +36,8 @@ const MAX_PERSISTED_ASSISTANT_MESSAGE_BYTES = 64 * 1024;
 const MAX_PERSISTED_IDENTIFIER_BYTES = 512;
 const MAX_SUGGESTION_METADATA_BYTES = 160;
 const MAX_SUGGESTION_REQUEST_ID_BYTES = 128;
+const MAX_CHANGES = 20;
+const MAX_PREVIEW_CHARS = 60;
 const STORAGE_PREFIX = "thought.pro-chat.v1.";
 const STORAGE_VERSION = 1;
 const TEXT_FILE_NAME = /\.(?:csv|html?|json|log|markdown|md|toml|txt|xml|ya?ml)$/i;
@@ -49,7 +52,8 @@ export type ProChatDocument = {
   id: string;
   title: string;
   snapshot(): unknown;
-  suggestionPosition(): SuggestionPosition;
+  /** Each top-level block's id, in the snapshot's order; null if not saved yet. */
+  blockIds(): Array<string | null>;
   waitUntilSaved(): Promise<boolean>;
   selectedText(): string | null;
 };
@@ -58,7 +62,10 @@ type ChatStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 type Options = {
   bridge?: ProChatBridge | null;
-  suggestResponse?: (input: ChatSuggestionInput) => Promise<unknown>;
+  /** Turn one chat edit into a suggestion in the note. */
+  suggestEdit?: (input: ChatSuggestionInput) => Promise<{ suggestion: { suggestion_id: string } }>;
+  /** Show a suggestion in the note and open its card. */
+  focusSuggestion?: (suggestionId: string) => void;
   createRequestId?: () => string;
   onNotice?: (message: string, kind?: "info" | "error") => void;
   storage?: ChatStorage | null;
@@ -68,6 +75,13 @@ type Options = {
   onSelectionChange?: (provider: ProProvider | null) => void;
 };
 
+/** A suggestion a reply made in the note, as the chat links to it. */
+type ChangeSummary = {
+  suggestion_id: string;
+  kind: ChatEdit["kind"];
+  preview: string;
+};
+
 type LocalMessage = ChatMessage & {
   meta?: string;
   incomplete?: boolean;
@@ -75,17 +89,17 @@ type LocalMessage = ChatMessage & {
   thinking?: ThinkingLevel;
   attachments?: AttachmentSummary[];
   suggestionRequestId?: string;
-  suggested?: boolean;
+  changes?: ChangeSummary[];
 };
 
-type PersistedResponse = Omit<SendChatResponse, "text">;
+type PersistedResponse = Omit<SendChatResponse, "text" | "edits">;
 
 type PersistedMessage = ChatMessage & {
   response?: PersistedResponse;
   thinking?: ThinkingLevel;
   attachments?: AttachmentSummary[];
   suggestionRequestId?: string;
-  suggested?: true;
+  changes?: ChangeSummary[];
 };
 
 type PersistedConversation = {
@@ -178,12 +192,71 @@ function response(value: unknown, text: string): SendChatResponse | undefined {
   ) return undefined;
   return {
     text,
+    edits: [],
     provider: responseProvider,
     requested_model: value.requested_model,
     reported_model: value.reported_model,
     wording_revision: value.wording_revision,
     complete: value.complete,
   };
+}
+
+function changeSummary(value: unknown): ChangeSummary | null {
+  if (
+    !isRecord(value) || !storedString(value.suggestion_id, MAX_PERSISTED_IDENTIFIER_BYTES) ||
+    /[\u0000-\u001f\u007f-\u009f]/.test(value.suggestion_id) ||
+    (value.kind !== "replace_block" && value.kind !== "insert_blocks" &&
+      value.kind !== "delete_block") ||
+    typeof value.preview !== "string" || value.preview.length > MAX_PREVIEW_CHARS + 1
+  ) return null;
+  return { suggestion_id: value.suggestion_id, kind: value.kind, preview: value.preview };
+}
+
+/** The first line of some Markdown as plain words, shortened for a link. */
+function preview(markdown: string): string {
+  const line = markdown.split("\n").map((part) => part.trim()).find(Boolean) ?? "";
+  const plain = line.replace(/^(#{1,6}\s+|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+|>\s*)/, "")
+    .replace(/[*_`~]/g, "");
+  return plain.length > MAX_PREVIEW_CHARS ? `${plain.slice(0, MAX_PREVIEW_CHARS).trimEnd()}…` : plain;
+}
+
+const CHANGE_VERBS: Record<ChatEdit["kind"], string> = {
+  replace_block: "Edit",
+  insert_blocks: "Add",
+  delete_block: "Delete",
+};
+
+/**
+ * A chat edit addressed by block index, readdressed by block id. A block the
+ * CRDT does not hold yet (the trailing empty paragraph of a new note) is
+ * replaced by inserting after the last block it does hold.
+ */
+function chatChange(edit: ChatEdit, ids: Array<string | null>): ChatChange | null {
+  const after = (index: number): SuggestionPosition => {
+    for (let at = index; at >= 0; at--) {
+      const id = ids[at];
+      if (id) return { kind: "block", block_id: id };
+    }
+    return { kind: "start" };
+  };
+  switch (edit.kind) {
+    case "insert_blocks":
+      return {
+        kind: "insert_blocks",
+        after: edit.after.kind === "block" ? after(edit.after.block) : edit.after,
+        markdown: edit.markdown,
+      };
+    case "replace_block": {
+      const id = ids[edit.block];
+      return id
+        ? { kind: "replace_block", block_id: id, markdown: edit.markdown, original: edit.original }
+        : { kind: "insert_blocks", after: after(edit.block - 1), markdown: edit.markdown };
+    }
+    case "delete_block": {
+      const id = ids[edit.block];
+      return id ? { kind: "delete_block", block_id: id, original: edit.original } : null;
+    }
+  }
 }
 
 function attachmentSummary(value: unknown): AttachmentSummary | null {
@@ -220,7 +293,11 @@ function localMessage(value: unknown): LocalMessage | null {
     ? value.suggestionRequestId
     : undefined;
   if (value.suggestionRequestId !== undefined && suggestionRequestId === undefined) return null;
+  // Written by the old Add to Note button; nothing reads it now.
   if (value.suggested !== undefined && value.suggested !== true) return null;
+  if (value.changes !== undefined && !Array.isArray(value.changes)) return null;
+  const changes = Array.isArray(value.changes) ? value.changes.map(changeSummary) : [];
+  if (changes.length > MAX_CHANGES || changes.some((change) => change === null)) return null;
   if (value.attachments !== undefined && !Array.isArray(value.attachments)) return null;
   const attachments = Array.isArray(value.attachments)
     ? value.attachments.map(attachmentSummary)
@@ -241,7 +318,8 @@ function localMessage(value: unknown): LocalMessage | null {
   if (savedResponse && requestedThinking === null) return null;
   if (savedResponse && suggestionRequestId === undefined) return null;
   const hasAssistantOnlyState = value.response !== undefined || value.thinking !== undefined ||
-    value.suggestionRequestId !== undefined || value.suggested !== undefined;
+    value.suggestionRequestId !== undefined || value.suggested !== undefined ||
+    changes.length > 0;
   if (
     (value.role !== "assistant" && hasAssistantOnlyState) ||
     (value.role === "assistant" && attachmentValues.length > 0) ||
@@ -259,7 +337,7 @@ function localMessage(value: unknown): LocalMessage | null {
     thinking: requestedThinking ?? undefined,
     attachments: attachmentValues.length > 0 ? attachmentValues : undefined,
     suggestionRequestId,
-    suggested: value.suggested === true,
+    changes: changes.length > 0 ? changes as ChangeSummary[] : undefined,
     meta: savedResponse
       ? [PROVIDER_NAMES[savedResponse.provider], reportedModel, thinkingCopy]
         .filter(Boolean).join(" · ")
@@ -311,7 +389,7 @@ function persistedMessage(message: LocalMessage): PersistedMessage {
     saved.attachments = message.attachments.map((attachment) => ({ ...attachment }));
   }
   if (message.suggestionRequestId) saved.suggestionRequestId = message.suggestionRequestId;
-  if (message.suggested) saved.suggested = true;
+  if (message.changes?.length) saved.changes = message.changes.map((change) => ({ ...change }));
   return saved;
 }
 
@@ -399,7 +477,6 @@ export function installProChat(
   let messages: LocalMessage[] = [];
   let stagedAttachments: StagedAttachment[] = [];
   let pendingText: string | null = null;
-  let suggesting: LocalMessage | null = null;
   let providers: ProProvider[] = [];
   /** Model lists per configured provider, loaded once per session. */
   const catalog = new Map<ProProvider, ProviderModel[]>();
@@ -542,21 +619,22 @@ export function installProChat(
       incomplete.textContent = "Provider marked this response incomplete";
       item.append(incomplete);
     }
-    if (message.response?.complete && options.suggestResponse) {
-      const suggest = root.createElement("button");
-      suggest.type = "button";
-      suggest.className = "text-button pro-chat-suggest";
-      // Lands as a suggestion in the note, to accept or reject there.
-      suggest.textContent = message.suggested
-        ? "Suggested in note"
-        : suggesting === message
-          ? "Adding…"
-          : "Add to Note";
-      suggest.title = "Add this to the note as a suggestion to accept or reject";
-      suggest.disabled = message.suggested === true || loadingModels || suggesting !== null ||
-        pendingText !== null || readingAttachments;
-      suggest.addEventListener("click", () => void suggestMessage(message));
-      item.append(suggest);
+    if (message.changes?.length) {
+      const changes = root.createElement("div");
+      changes.className = "pro-chat-changes";
+      for (const change of message.changes) {
+        const link = root.createElement("button");
+        link.type = "button";
+        link.className = "pro-chat-change";
+        link.dataset.kind = change.kind;
+        link.textContent = change.preview
+          ? `${CHANGE_VERBS[change.kind]}: ${change.preview}`
+          : CHANGE_VERBS[change.kind];
+        link.title = "Show this suggestion in the note";
+        link.addEventListener("click", () => options.focusSuggestion?.(change.suggestion_id));
+        changes.append(link);
+      }
+      item.append(changes);
     }
     return item;
   }
@@ -570,7 +648,7 @@ export function installProChat(
     messagesElement.hidden = rendered.length === 0;
     empty.hidden = rendered.length !== 0;
     if (newChat) newChat.hidden = messages.length === 0 && pendingText === null;
-    if (newChat) newChat.disabled = loadingModels || pendingText !== null || suggesting !== null ||
+    if (newChat) newChat.disabled = loadingModels || pendingText !== null ||
       readingAttachments;
   }
 
@@ -582,7 +660,7 @@ export function installProChat(
   }
 
   function renderAttachments(): void {
-    const busy = pendingText !== null || suggesting !== null || readingAttachments;
+    const busy = pendingText !== null || readingAttachments;
     const items = stagedAttachments.map((attachment, index) => {
       const item = root.createElement("li");
       const name = root.createElement("span");
@@ -604,7 +682,7 @@ export function installProChat(
 
   function renderControls(): void {
     const hasModel = selectedModel !== "";
-    const busy = pendingText !== null || suggesting !== null || readingAttachments;
+    const busy = pendingText !== null || readingAttachments;
     documentLabel.textContent = currentDocument
       ? `Current document: ${currentDocument.title}`
       : "Open a document to start a chat.";
@@ -642,7 +720,6 @@ export function installProChat(
     requestGeneration += 1;
     retry.hidden = true;
     pendingText = null;
-    suggesting = null;
     input.value = "";
     clearAttachments();
     setError(null);
@@ -843,7 +920,7 @@ export function installProChat(
     if (
       bridge === null || document === null || selectedProvider === null ||
       selectedModel === "" || pendingText !== null ||
-      suggesting !== null || readingAttachments || !message
+      readingAttachments || !message
     ) return;
     if (messages.length >= MAX_PERSISTED_MESSAGES) {
       setError("This conversation is full. Start a new chat.");
@@ -859,6 +936,8 @@ export function installProChat(
 
     const model = selectedModel;
     const selectedThinking = thinking(thinkingSelect.value);
+    const snapshot = document.snapshot();
+    const blockIds = document.blockIds();
     const generation = ++requestGeneration;
     const previous = messages.map(({ role, text }) => ({ role, text }));
     const requestAttachments: ChatAttachment[] = stagedAttachments.map((attachment) => ({
@@ -878,7 +957,7 @@ export function installProChat(
     try {
       const chatResponse = await bridge.send({
         document_title: document.title,
-        document: document.snapshot(),
+        document: snapshot,
         provider: selectedProvider,
         model,
         thinking: selectedThinking,
@@ -891,8 +970,13 @@ export function installProChat(
       if (destroyed || generation !== requestGeneration || currentDocument?.id !== document.id) {
         return;
       }
+      // Validated by the native side; an older one sends no edits at all.
+      chatResponse.edits = Array.isArray(chatResponse.edits) ? chatResponse.edits : [];
+      if (!chatResponse.text.trim() && chatResponse.edits.length === 0) {
+        throw new Error("The provider returned an empty reply.");
+      }
       if (
-        !chatResponse.text.trim() || chatResponse.text.includes("\0") ||
+        chatResponse.text.includes("\0") ||
         new TextEncoder().encode(chatResponse.text).byteLength >
           MAX_PERSISTED_ASSISTANT_MESSAGE_BYTES
       ) throw new Error("The provider returned a response that is too large to use safely.");
@@ -902,6 +986,15 @@ export function installProChat(
       if (!validSuggestionRequestId(suggestionRequestId)) {
         throw new Error("Proof of Thought could not create a safe suggestion retry identifier.");
       }
+      const changes = await suggestEdits(document, chatResponse, blockIds, suggestionRequestId);
+      if (destroyed || generation !== requestGeneration || currentDocument?.id !== document.id) {
+        return;
+      }
+      const text = chatResponse.text.trim()
+        ? chatResponse.text
+        : changes.length === 0
+          ? "Could not suggest the edits."
+          : changes.length === 1 ? "Suggested an edit." : `Suggested ${changes.length} edits.`;
       messages.push(
         {
           role: "user",
@@ -910,12 +1003,13 @@ export function installProChat(
         },
         {
           role: "assistant",
-          text: chatResponse.text,
+          text,
           meta: `${PROVIDER_NAMES[chatResponse.provider]} · ${reportedModel} · ${thinkingCopy}`,
           incomplete: !chatResponse.complete,
           response: chatResponse,
           thinking: selectedThinking,
           suggestionRequestId,
+          changes: changes.length > 0 ? changes : undefined,
         },
       );
       clearAttachments();
@@ -933,53 +1027,48 @@ export function installProChat(
     }
   }
 
-  async function suggestMessage(message: LocalMessage): Promise<void> {
-    const document = currentDocument;
-    const chatResponse = message.response;
-    if (
-      document === null || chatResponse === undefined || !chatResponse.complete ||
-      options.suggestResponse === undefined || message.suggested || suggesting !== null ||
-      pendingText !== null || readingAttachments || message.suggestionRequestId === undefined
-    ) return;
-    const generation = ++requestGeneration;
-    suggesting = message;
-    setError(null);
-    render();
-    try {
-      if (!(await document.waitUntilSaved())) {
-        throw new Error("Wait for this document to finish saving, then try again.");
-      }
-      if (destroyed || generation !== requestGeneration || currentDocument?.id !== document.id) {
-        return;
-      }
-      saveConversation();
-      await options.suggestResponse({
-        documentId: document.id,
-        requestId: message.suggestionRequestId,
-        provider: chatResponse.provider,
-        requestedModel: chatResponse.requested_model,
-        reportedModel: chatResponse.reported_model,
-        assistantText: chatResponse.text,
-        wordingRevision: chatResponse.wording_revision,
-        after: document.suggestionPosition(),
-      });
-      if (destroyed || generation !== requestGeneration || currentDocument?.id !== document.id) {
-        return;
-      }
-      message.suggested = true;
-      saveConversation();
-      options.onNotice?.("Suggestion added for review.");
-    } catch (cause) {
-      if (!destroyed && generation === requestGeneration) {
-        setError(`Could not add to the note: ${oneLine(cause, "The provider request failed.")}`);
-        options.onNotice?.("Could not create the suggestion.", "error");
-      }
-    } finally {
-      if (!destroyed && generation === requestGeneration) {
-        suggesting = null;
-        render();
+  /**
+   * Turn a reply's edits into suggestions in the note, in order. Each edit
+   * that fails is reported once; the rest still land.
+   */
+  async function suggestEdits(
+    document: ProChatDocument,
+    chatResponse: SendChatResponse,
+    blockIds: Array<string | null>,
+    requestId: string,
+  ): Promise<ChangeSummary[]> {
+    if (chatResponse.edits.length === 0 || options.suggestEdit === undefined) return [];
+    if (!(await document.waitUntilSaved())) {
+      throw new Error("Wait for this note to finish saving, then try again.");
+    }
+    const changes: ChangeSummary[] = [];
+    const failures: string[] = [];
+    for (const [index, edit] of chatResponse.edits.slice(0, MAX_CHANGES).entries()) {
+      const change = chatChange(edit, blockIds);
+      if (change === null) continue;
+      try {
+        const outcome = await options.suggestEdit({
+          documentId: document.id,
+          requestId: `${requestId}.${index}`,
+          provider: chatResponse.provider,
+          requestedModel: chatResponse.requested_model,
+          reportedModel: chatResponse.reported_model,
+          change,
+        });
+        changes.push({
+          suggestion_id: outcome.suggestion.suggestion_id,
+          kind: edit.kind,
+          preview: preview(edit.kind === "delete_block" ? edit.original : edit.markdown),
+        });
+      } catch (cause) {
+        failures.push(oneLine(cause, "The suggestion could not be created."));
       }
     }
+    if (failures.length > 0) {
+      const count = failures.length === 1 ? "an edit" : `${failures.length} edits`;
+      setError(`Could not suggest ${count}: ${failures[0]}`);
+    }
+    return changes;
   }
 
   listen(modelSelect, "change", () => {

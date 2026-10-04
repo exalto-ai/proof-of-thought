@@ -120,6 +120,21 @@ impl Daemon {
             .expect("editor response is json")
     }
 
+    /// The HTTP status of an editor request, for requests expected to fail.
+    pub fn editor_post_status(&self, path: &str, body: serde_json::Value) -> u16 {
+        let url = self.url.replace("/mcp", path);
+        self.agent
+            .post(&url)
+            .config()
+            .http_status_as_error(false)
+            .build()
+            .header("Authorization", &format!("Bearer {}", self.token))
+            .send_json(&body)
+            .expect("editor request completed")
+            .status()
+            .as_u16()
+    }
+
     pub fn create_reviewer(&self) -> String {
         let response = self.editor_post(
             "/editor/reviewer-connections",

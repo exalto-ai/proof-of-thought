@@ -57,7 +57,7 @@ describe("editor document lifecycle", () => {
     ]);
   });
 
-  it("submits provider text only as a pending chat suggestion", async () => {
+  it("submits a chat edit only as a pending chat suggestion", async () => {
     const fetch = vi.fn().mockResolvedValue(
       Response.json({ suggestion: { suggestion_id: "pro-chat:one" } }),
     );
@@ -70,9 +70,7 @@ describe("editor document lifecycle", () => {
       provider: "openai",
       requestedModel: "gpt-test",
       reportedModel: null,
-      assistantText: "Suggested ending",
-      wordingRevision: "wording-one",
-      after: { kind: "end" },
+      change: { kind: "insert_blocks", after: { kind: "end" }, markdown: "Suggested ending" },
     });
 
     expect(fetch).toHaveBeenCalledWith(
@@ -84,9 +82,7 @@ describe("editor document lifecycle", () => {
           provider: "openai",
           requested_model: "gpt-test",
           reported_model: null,
-          assistant_text: "Suggested ending",
-          wording_revision: "wording-one",
-          after: { kind: "end" },
+          change: { kind: "insert_blocks", after: { kind: "end" }, markdown: "Suggested ending" },
         }),
       }),
     );

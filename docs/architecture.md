@@ -545,8 +545,12 @@ document changes remain a separate suggestion operation rather than an implicit 
 
 ### AD-24 — Chat responses enter documents only through review
 
-A complete built-in chat response may be handed to the daemon as a pending block insertion. The
-daemon rejects it if the document wording has changed since generation. It uses the existing
+Built-in chat edits the note through block-addressed tools (replace, insert, delete), and each
+edit is handed to the daemon as its own pending suggestion. The daemon refuses an edit whose
+target block has changed since generation. Amended 2026-10-04: chat used to offer one whole reply
+as an insertion, which could not shorten or rewrite existing text, and a whole-note wording check
+refused it after any edit anywhere. The cost is a second model contract to keep working across
+three providers' tool-call formats, and more suggestions per request to review. It uses the existing
 suggestion store and Accept/Reject flow; chat has no direct-write route. Provider and model labels
 are explicitly reported claims, not proof of upstream identity.
 

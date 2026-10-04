@@ -24,7 +24,10 @@ type AiSupportOptions = {
   storage?: Storage | null;
   providerBridge?: ProProviderBridge | null;
   chatBridge?: ProChatBridge | null;
-  suggestChatResponse?: (input: ChatSuggestionInput) => Promise<unknown>;
+  suggestChatEdit?: (
+    input: ChatSuggestionInput,
+  ) => Promise<{ suggestion: { suggestion_id: string } }>;
+  focusSuggestion?: (suggestionId: string) => void;
   openSettings?: () => void | Promise<void>;
   onNotice?: (message: string, kind?: "info" | "error") => void;
 };
@@ -62,7 +65,8 @@ export function installAiSupport(
   const disposers: Array<() => void> = [];
   const chat = installProChat(root, {
     bridge: options.chatBridge,
-    suggestResponse: options.suggestChatResponse,
+    suggestEdit: options.suggestChatEdit,
+    focusSuggestion: options.focusSuggestion,
     onNotice: options.onNotice,
     openSettings: () => void options.openSettings?.(),
     // OpenAI asks that chat say when it is running on the ChatGPT plan.
