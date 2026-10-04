@@ -39,6 +39,9 @@
      tables and code in it, not a book, and those want the room. */
   --measure: 48rem;
   --chrome-height: 44px;
+  /* Where the macOS window buttons end (see trafficLightPosition in
+     tauri.conf.json), and so where the left sidebar toggle starts. */
+  --window-buttons-end: 84px;
 }
 
 /* The light palette keeps the blue bias of the dark neutrals. Its accent and
@@ -113,17 +116,32 @@ html, body {
 body { display: flex; flex-direction: column; overflow: hidden; }
 
 /* ---------- chrome ---------- */
-.chrome {
+/* Every column runs to the top of the window and owns its own title-bar
+   strip; the window buttons sit over the documents sidebar, as in Notes. */
+.titlebar {
+  flex: 0 0 auto;
   height: var(--chrome-height);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  /* Leaves room for the traffic lights. */
-  padding: 0 16px 0 82px;
   -webkit-user-select: none;
   user-select: none;
 }
+.main-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chrome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+}
+/* With a sidebar hidden, the editor's strip makes room for what is pinned
+   over that corner: the window buttons and toggle, or the AI toggle. */
+.workspace:has(> #doc-sidebar[hidden]) .chrome {
+  padding-left: calc(var(--window-buttons-end) + 40px);
+}
+.workspace:has(> #ai-support-sidebar[hidden]) .chrome { padding-right: 52px; }
 .presence { display: flex; gap: 4px; margin-left: auto; }
 .who {
   width: 20px; height: 20px;
@@ -161,6 +179,9 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .status[data-state="connecting"] { background: var(--status-caution); }
 .status[data-state="offline"] { background: var(--status-negative); }
 .panel-toggle {
+  position: fixed;
+  top: calc((var(--chrome-height) - 26px) / 2);
+  z-index: 25;
   display: inline-grid;
   place-items: center;
   width: 28px;
@@ -267,7 +288,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 10px 6px;
+  padding: 0 10px 6px;
 }
 #doc-filter {
   flex: 1;
@@ -350,13 +371,15 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .doc-row-date { color: var(--ink-faint); font-size: 11.5px; }
 .doc-list-empty { margin: 4px 18px; color: var(--ink-faint); font-size: 12.5px; }
 .doc-list-empty[hidden] { display: none; }
+#doc-sidebar-toggle { left: var(--window-buttons-end); }
+#ai-support-toggle { right: 10px; }
 .ai-sidebar-header {
-  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px 16px 6px;
+  /* The AI toggle is pinned over this strip's right end. */
+  padding: 0 52px 0 16px;
 }
 .ai-sidebar h2 {
   margin: 0;

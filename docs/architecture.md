@@ -936,6 +936,11 @@ right sidebar, open by default and resizable by dragging its border, holds built
 current text's recorded sources. A title-bar toggle is its only show/hide control, and the choice
 and width are remembered per machine.
 
+Both sidebars run the full height of the window, as in Notes: the macOS window buttons sit
+over the documents sidebar (moved to centre on the page's 44px title-bar row), each column owns
+its own title-bar strip, and the two sidebar toggles stay pinned beside the window buttons and in
+the top-right corner whether or not their sidebars show.
+
 A matching left sidebar lists every document, newest first, grouped by recency (Today,
 Yesterday, Previous 7 and 30 Days, then by month and year) with a search field backed by the
 same FTS `search`. Documents are a flat set named by their own first line, so this is a list,

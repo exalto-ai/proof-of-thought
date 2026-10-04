@@ -433,9 +433,12 @@ fn new_window(
         .visible(false);
     #[cfg(target_os = "macos")]
     {
+        // Matches tauri.conf.json: window buttons centred on the 44px
+        // title-bar row the page draws, beside the sidebar toggle.
         builder = builder
             .title_bar_style(tauri::TitleBarStyle::Overlay)
-            .hidden_title(true);
+            .hidden_title(true)
+            .traffic_light_position(tauri::LogicalPosition::new(16.0, 24.0));
     }
     let child = builder.build().map_err(|e| e.to_string())?;
     if let Ok(target_size) = child.outer_size()
