@@ -45,7 +45,6 @@ function selectText(editor: Editor) {
 function toolbarOptions(overrides: Partial<ToolbarOptions> = {}): ToolbarOptions {
   return {
     openLink: vi.fn(() => true),
-    newDocument: vi.fn(),
     subscribeSaveStatus: (listener) => {
       listener("saved");
       return vi.fn();
@@ -252,14 +251,12 @@ describe("installed toolbar", () => {
     cleanup();
   });
 
-  it("routes the new document command and leaves Markdown files to shortcuts", () => {
+  it("leaves new notes and Markdown files to the sidebar and shortcuts", () => {
     const actions = toolbarOptions();
     const { editor, element } = makeEditor();
     const cleanup = installToolbar(editor, element, actions);
 
-    document.querySelector<HTMLButtonElement>('[aria-label="New document"]')!.click();
-
-    expect(actions.newDocument).toHaveBeenCalledOnce();
+    expect(document.querySelector('[aria-label="New document"]')).toBeNull();
     expect(document.querySelector('[aria-label="Import Markdown file"]')).toBeNull();
     expect(document.querySelector('[aria-label="Export Markdown copy"]')).toBeNull();
     cleanup();

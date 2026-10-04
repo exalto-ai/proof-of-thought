@@ -8,8 +8,8 @@ This file covers copied assets and the locked production dependencies shipped in
 
 ### Lucide
 
-The editor includes the `file-plus`, `panel-left`, `panel-right`, `settings`, `message-square`, `plug`, `search`, `plus`, `arrow-up`, `paperclip`, `globe`, `copy`, `pencil`,
-`link-2`, and `link-2-off` icons from
+The editor includes the `panel-left`, `panel-right`, `settings`, `message-square`, `plug`, `search`, `plus`, `arrow-up`, `paperclip`, `globe`, `copy`, `pencil`,
+`check`, `x`, `link-2`, and `link-2-off` icons from
 [Lucide](https://github.com/lucide-icons/lucide), copied from commit
 `23f9abc4ed0146cffededd3d7f94c1018bfdf693`.
 

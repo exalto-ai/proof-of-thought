@@ -402,9 +402,6 @@ async function openDocument(docId: string): Promise<boolean> {
     awareness,
     provider,
     user,
-    {
-      newDocument: createNewDocument,
-    },
   );
   awareness.setLocalStateField("user", user);
 

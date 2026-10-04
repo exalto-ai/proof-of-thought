@@ -129,7 +129,6 @@ export function applyBlockStyle(editor: Editor, style: BlockStyle): boolean {
 
 export type ToolbarOptions = {
   openLink: () => boolean;
-  newDocument: () => void | Promise<void>;
   subscribeSaveStatus: (listener: (status: SaveStatus) => void) => () => void;
 };
 
@@ -148,12 +147,6 @@ export function installToolbar(
   toolbar.className = "format-toolbar";
   toolbar.setAttribute("role", "group");
   toolbar.setAttribute("aria-label", "Editor tools");
-
-  const newDocument = buttonControl(
-    "New document",
-    icon(ICONS.filePlus),
-    "is-icon is-new-document",
-  );
 
   const zoom = selectControl("Editor zoom", "zoom-select");
   for (const level of ZOOM_LEVELS) zoom.append(option(String(level), `${level}%`));
@@ -211,8 +204,6 @@ export function installToolbar(
   };
 
   toolbar.append(
-    newDocument,
-    divider(),
     zoom,
     divider(),
     block,
@@ -265,7 +256,6 @@ export function installToolbar(
     else chain.unsetMark("fontSize").run();
     update();
   });
-  newDocument.addEventListener("click", () => void actions.newDocument());
   bold.addEventListener("click", () => editor.chain().focus().toggleBold().run());
   italic.addEventListener("click", () => editor.chain().focus().toggleItalic().run());
   link.addEventListener("click", () => actions.openLink());

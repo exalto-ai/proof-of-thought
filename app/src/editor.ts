@@ -13,11 +13,10 @@ import type { SyncProvider } from "./provider";
 import { FindExtension, installFind } from "./find";
 import { installLinkShortcut } from "./link";
 import { installSlashMenu } from "./slash";
-import { installToolbar, type ToolbarOptions } from "./toolbar";
+import { installToolbar } from "./toolbar";
 import { MAX_EDITOR_RANGES, type EditorRange } from "./protocol";
 
 export type Actor = { name: string; color: string; id: number };
-export type EditorActions = Omit<ToolbarOptions, "openLink" | "subscribeSaveStatus">;
 
 export function transactionRanges(transaction: Transform): EditorRange[] {
   if (transaction.steps.length === 0) return [];
@@ -102,7 +101,6 @@ export function createEditor(
   awareness: Awareness,
   provider: SyncProvider,
   user: Actor,
-  actions: EditorActions,
   shouldAutoFocus: () => boolean = () => true,
 ): Editor {
   const editor = new Editor({
@@ -133,7 +131,6 @@ export function createEditor(
   const links = installLinkShortcut(editor, host);
   const destroyFind = installFind(editor, element.closest<HTMLElement>(".main-column") ?? host);
   const destroyToolbar = installToolbar(editor, element, {
-    ...actions,
     openLink: links.open,
     subscribeSaveStatus: (listener) => provider.subscribeSaveStatus(listener),
   });
