@@ -25,18 +25,14 @@ type AiSupportOptions = {
   onNotice?: (message: string, kind?: "info" | "error") => void;
 };
 
-export type AiSupportController = {
-  isOpen(): boolean;
+type AiSupportController = {
   setCurrentDocument(context: ProChatDocument | null): void;
-  refreshProviders(): Promise<void>;
-  open(): void;
-  close(): void;
   destroy(): void;
 };
 
 function required<T extends Element>(root: ParentNode, selector: string): T {
   const value = root.querySelector<T>(selector);
-  if (!value) throw new Error(`missing AI support element: ${selector}`);
+  if (!value) throw new Error(`missing AI sidebar element: ${selector}`);
   return value;
 }
 
@@ -67,7 +63,7 @@ function writeItem(storage: Storage | null, key: string, value: string) {
 }
 
 /** The sidebar starts open unless this user last closed it. */
-export function readSidebarOpen(storage: Storage | null): boolean {
+function readSidebarOpen(storage: Storage | null): boolean {
   return readItem(storage, AI_SIDEBAR_OPEN_STORAGE_KEY) !== "false";
 }
 
@@ -79,7 +75,7 @@ export function clampSidebarWidth(width: number, available: number): number {
   return Math.round(Math.min(max, Math.max(SIDEBAR_MIN_WIDTH, width)));
 }
 
-export function readSidebarWidth(storage: Storage | null): number {
+function readSidebarWidth(storage: Storage | null): number {
   const value = Number(readItem(storage, AI_SIDEBAR_WIDTH_STORAGE_KEY));
   return Number.isFinite(value) && value > 0 ? value : SIDEBAR_DEFAULT_WIDTH;
 }
@@ -289,14 +285,10 @@ export function installAiSupport(
   void refreshProviders();
 
   return {
-    isOpen: () => sidebarOpen,
     setCurrentDocument(context) {
       chat.setDocument(context);
       if (sidebarOpen && configured.size > 0) preferConfiguredProvider();
     },
-    refreshProviders,
-    open,
-    close,
     destroy() {
       for (const dispose of disposers.splice(0)) dispose();
       chat.destroy();

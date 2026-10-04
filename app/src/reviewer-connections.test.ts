@@ -18,7 +18,6 @@ beforeEach(() => {
       <select id="reviewer-client"><option value="chatgpt">ChatGPT</option><option value="codex">Codex</option></select>
       <input id="reviewer-label" />
       <select id="reviewer-scope"><option value="current">Current</option><option value="all">All</option></select>
-      <p id="reviewer-current"></p>
       <button id="reviewer-cancel" type="button"></button>
     </form>
     <section id="reviewer-setup" hidden>
@@ -61,12 +60,13 @@ describe("reviewer connections", () => {
     const controller = installReviewerConnections(document, { api });
     controller.setDocument({ id: "doc-1", title: "Draft" });
     controller.setExecutable("/Applications/Proof of Thought/shim");
-    controller.setOpen(true);
+    void controller.refresh();
     await Promise.resolve();
 
     document.querySelector<HTMLButtonElement>("#reviewer-add")!.click();
     document.querySelector<HTMLSelectElement>("#reviewer-client")!.value = "codex";
     document.querySelector<HTMLInputElement>("#reviewer-label")!.value = "Review";
+    document.querySelector<HTMLSelectElement>("#reviewer-scope")!.value = "current";
     document
       .querySelector<HTMLFormElement>("#reviewer-form")!
       .dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }));
@@ -106,7 +106,7 @@ describe("reviewer connections", () => {
       revokeReviewerConnection: vi.fn(),
     };
     const controller = installReviewerConnections(document, { api });
-    controller.setOpen(true);
+    void controller.refresh();
     await Promise.resolve();
     await Promise.resolve();
 
@@ -168,7 +168,7 @@ describe("reviewer connections", () => {
       api,
       confirmAction: () => true,
     });
-    controller.setOpen(true);
+    void controller.refresh();
     await Promise.resolve();
     await Promise.resolve();
 

@@ -374,17 +374,6 @@ async function openDocument(docId: string): Promise<boolean> {
   provider.connect();
   open = { doc, awareness, provider, editor, rails, suggestions };
   openDocId = docId;
-  aiSupport.setCurrentDocument({
-    id: docId,
-    title: deriveTitle(editor),
-    snapshot: () => editor.getJSON(),
-    suggestionPosition: () => suggestionPositionAtSelection(editor, doc),
-    waitUntilSaved: () => provider.waitUntilSaved(),
-    selectedText: () => {
-      const { from, to } = editor.state.selection;
-      return from === to ? null : editor.state.doc.textBetween(from, to, "\n", "\n");
-    },
-  });
   currentSources.setDocument(docId);
 
   // Exposed in development so the editor can be driven directly. Synthetic

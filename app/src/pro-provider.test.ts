@@ -30,7 +30,6 @@ describe("provider settings", () => {
       remove: vi.fn(),
     };
     const controller = installProProvider(document, { bridge });
-    controller.setActive(true);
     await vi.waitFor(() => {
       expect(document.querySelector('[data-provider="openai"]')?.textContent)
         .toContain("Key saved");
@@ -55,7 +54,6 @@ describe("provider settings", () => {
       }),
     };
     const controller = installProProvider(document, { bridge });
-    controller.setActive(true);
     await vi.waitFor(() => expect(bridge.list).toHaveBeenCalledOnce());
 
     document.querySelector<HTMLButtonElement>(

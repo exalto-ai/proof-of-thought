@@ -51,8 +51,6 @@ type Options = {
   copyText?: (text: string) => Promise<void>;
   confirmAction?: (message: string) => boolean;
   onNotice?: (message: string, kind?: "info" | "error") => void;
-  /** Scope for a new connection; otherwise the current document when one is set. */
-  defaultScope?: ReviewerAccess["document_scope"];
   /** Lets a document picker follow the connection being edited. */
   onEditDocument?: (documentId: string | null) => void;
 };
@@ -61,7 +59,8 @@ export type ReviewerController = {
   setApi(api: ReviewerApi | null): void;
   setDocument(context: ReviewerDocumentContext | null): void;
   setExecutable(path: string): void;
-  setOpen(open: boolean): void;
+  /** Re-read connections from the daemon, e.g. when Settings regains focus. */
+  refresh(): Promise<void>;
   destroy(): void;
 };
 
@@ -85,7 +84,6 @@ export function installReviewerConnections(
   const client = required<HTMLSelectElement>(root, "#reviewer-client");
   const label = required<HTMLInputElement>(root, "#reviewer-label");
   const scope = required<HTMLSelectElement>(root, "#reviewer-scope");
-  const current = required<HTMLElement>(root, "#reviewer-current");
   const cancel = required<HTMLButtonElement>(root, "#reviewer-cancel");
   const setup = required<HTMLElement>(root, "#reviewer-setup");
   const setupText = required<HTMLElement>(root, "#reviewer-setup-text");
@@ -101,7 +99,6 @@ export function installReviewerConnections(
   let executable = "";
   let connections: ReviewerConnection[] = [];
   let editing: ReviewerConnection | null = null;
-  let open = false;
   let generation = 0;
 
   function listen(target: EventTarget, event: string, listener: EventListener) {
@@ -120,10 +117,8 @@ export function installReviewerConnections(
       : { document_scope: "current", document_id: documentContext?.id ?? null };
   }
 
+  /** "One document" needs a document to bind to. */
   function renderDocument() {
-    current.textContent = documentContext
-      ? `Current: ${documentContext.title || "Untitled"}`
-      : "Open a document to use current-document access.";
     scope.querySelector<HTMLOptionElement>('option[value="current"]')!.disabled =
       !documentContext;
     if (!documentContext && scope.value === "current") scope.value = "all";
@@ -131,13 +126,12 @@ export function installReviewerConnections(
 
   function openForm(connection: ReviewerConnection | null) {
     editing = connection;
-    formTitle.textContent = connection ? "Edit reviewer" : "Add reviewer";
+    formTitle.textContent = connection ? "Edit app" : "Add app";
     client.disabled = Boolean(connection);
     client.value = connection?.client ?? "chatgpt";
     label.value = connection?.display_label ?? "";
     if (connection) options.onEditDocument?.(connection.access.document_id);
-    scope.value = connection?.access.document_scope ??
-      options.defaultScope ?? (documentContext ? "current" : "all");
+    scope.value = connection?.access.document_scope ?? "all";
     renderDocument();
     setup.hidden = true;
     form.hidden = false;
@@ -279,7 +273,6 @@ export function installReviewerConnections(
   return {
     setApi(value) {
       api = value;
-      if (open) void refresh();
     },
     setDocument(value) {
       documentContext = value;
@@ -288,10 +281,7 @@ export function installReviewerConnections(
     setExecutable(value) {
       executable = value;
     },
-    setOpen(value) {
-      open = value;
-      if (open) void refresh();
-    },
+    refresh,
     destroy() {
       generation += 1;
       for (const dispose of disposers.splice(0)) dispose();

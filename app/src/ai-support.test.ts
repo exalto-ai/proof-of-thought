@@ -59,7 +59,7 @@ describe("AI sidebar", () => {
   it("is open by default with no mode chooser", () => {
     const controller = installAiSupport(document, { storage: memoryStorage() });
 
-    expect(controller.isOpen()).toBe(true);
+    expect(sidebar().hidden).toBe(false);
     expect(sidebar().hidden).toBe(false);
     expect(toggle().getAttribute("aria-expanded")).toBe("true");
     expect(document.querySelector("[data-ai-mode]")).toBeNull();
@@ -73,15 +73,15 @@ describe("AI sidebar", () => {
 
     expect(document.querySelector("#ai-sidebar-close")).toBeNull();
     toggle().click();
-    expect(controller.isOpen()).toBe(false);
+    expect(sidebar().hidden).toBe(true);
     expect(sidebar().hidden).toBe(true);
     expect(storage.getItem(AI_SIDEBAR_OPEN_STORAGE_KEY)).toBe("false");
     controller.destroy();
 
     const reopened = installAiSupport(document, { storage });
-    expect(reopened.isOpen()).toBe(false);
+    expect(sidebar().hidden).toBe(true);
     toggle().click();
-    expect(reopened.isOpen()).toBe(true);
+    expect(sidebar().hidden).toBe(false);
     expect(storage.getItem(AI_SIDEBAR_OPEN_STORAGE_KEY)).toBe("true");
     reopened.destroy();
   });
@@ -95,7 +95,7 @@ describe("AI sidebar", () => {
     sidebar().focus();
 
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(controller.isOpen()).toBe(true);
+    expect(sidebar().hidden).toBe(false);
     expect(document.activeElement).toBe(editor);
     controller.destroy();
   });

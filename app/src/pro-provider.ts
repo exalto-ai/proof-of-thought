@@ -16,7 +16,6 @@ type Options = {
 };
 
 export type ProProviderController = {
-  setActive(active: boolean): void;
   destroy(): void;
 };
 
@@ -41,7 +40,6 @@ export function installProProvider(
   const bridge = options.bridge ?? null;
   const configured = new Map<ProProvider, boolean>();
   const disposers: Array<() => void> = [];
-  let active = false;
   let busy: ProProvider | null = null;
   let destroyed = false;
   let generation = 0;
@@ -74,7 +72,7 @@ export function installProProvider(
   }
 
   async function refresh(): Promise<void> {
-    if (!active || bridge === null || destroyed) return;
+    if (bridge === null || destroyed) return;
     const request = ++generation;
     error.hidden = true;
     try {
@@ -154,12 +152,8 @@ export function installProProvider(
   }
 
   render();
+  void refresh();
   return {
-    setActive(next) {
-      const opened = next && !active;
-      active = next;
-      if (opened) void refresh();
-    },
     destroy() {
       destroyed = true;
       generation += 1;

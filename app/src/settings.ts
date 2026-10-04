@@ -150,11 +150,10 @@ function announcingBridge(bridge: ProProviderBridge): ProProviderBridge {
   };
 }
 
-const providers = installProProvider(document, {
+installProProvider(document, {
   bridge: isTauri ? announcingBridge(tauriProProviderBridge()) : null,
   onNotice: notify,
 });
-providers.setActive(true);
 
 // ---------------------------------------------------------------- connected apps
 
@@ -165,7 +164,6 @@ let documents: DocumentSummary[] = [];
 
 const reviewers = installReviewerConnections(document, {
   onNotice: notify,
-  defaultScope: "all",
   onEditDocument(documentId) {
     if (documentId && documents.some((value) => value.doc_id === documentId)) {
       documentSelect.value = documentId;
@@ -215,7 +213,7 @@ async function connectReviewers() {
     const mcp = new Mcp(connection.mcp_url, connection.token);
     reviewers.setApi(new EditorApi(connection.mcp_url, connection.token));
     reviewers.setExecutable(connection.stdio_command);
-    reviewers.setOpen(true);
+    void reviewers.refresh();
     await mcp.connect();
     documents = await mcp.listDocuments();
     renderDocuments();
@@ -229,5 +227,5 @@ void connectReviewers();
 
 // Re-check status whenever Settings comes back to the front.
 window.addEventListener("focus", () => {
-  reviewers.setOpen(true);
+  void reviewers.refresh();
 });
