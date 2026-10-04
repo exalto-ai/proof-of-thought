@@ -120,15 +120,6 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   -webkit-user-select: none;
   user-select: none;
 }
-.title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-soft);
-  letter-spacing: -0.005em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .presence { display: flex; gap: 4px; margin-left: auto; }
 .who {
   width: 20px; height: 20px;
@@ -208,11 +199,6 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .ai-support-toggle .panel-fill { transition: none; }
 }
-
-/* The whole strip drags, so children must not swallow the press. The status
-   button is the deliberate exception — it opens the connections panel. */
-.chrome > *:not(.status):not(.presence):not(.ai-support-toggle) { pointer-events: none; }
-.status, .presence, .ai-support-toggle { pointer-events: auto; }
 
 /* ---------- workspace and AI sidebar ---------- */
 .workspace {
@@ -486,7 +472,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 }
 .current-sources li span { color: var(--ink-faint); font-size: 11px; text-transform: capitalize; }
 
-/* ---------- shared form pieces (sidebar and Settings) ---------- */
+/* ---------- shared form pieces ---------- */
 .reviewer-heading-actions,
 .reviewer-actions {
   display: flex;
@@ -587,7 +573,6 @@ body.settings-page {
 }
 .reviewer-list small { color: var(--ink-faint); font-size: 11.5px; }
 .reviewer-list .reviewer-actions { flex-wrap: wrap; justify-content: flex-end; }
-.reviewer-list .reviewer-actions button,
 .reviewer-actions button:not(.ghost) {
   padding: 0;
   border: 0;
@@ -596,7 +581,6 @@ body.settings-page {
   font: 500 12px/1.2 var(--sans);
   cursor: default;
 }
-.reviewer-list .reviewer-actions button:hover,
 .reviewer-actions button:not(.ghost):hover { color: var(--ink); }
 .reviewer-form,
 .reviewer-setup {
@@ -674,18 +658,6 @@ body.settings-page {
 .popover .name { color: var(--ink); }
 .popover .meta { margin-left: auto; color: var(--ink-faint); font-size: 11px; }
 .popover .none { color: var(--ink-faint); padding: 2px 0; }
-.popover .note { margin: 0 0 6px; color: var(--ink-faint); line-height: 1.45; }
-.popover pre {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  background: var(--raised);
-  border-radius: 7px;
-  padding: 8px 10px;
-  margin: 0 0 6px;
-  overflow-x: auto;
-  white-space: pre;
-  color: var(--ink-soft);
-}
 .ghost {
   font: inherit;
   font-size: 11.5px;
