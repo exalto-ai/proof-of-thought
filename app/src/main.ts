@@ -657,11 +657,12 @@ async function trashDocument(row: { doc_id: string; title: string }): Promise<bo
     return false;
   }
   if (wasOpen) {
-    const next = (await mcp.listDocuments())[0];
-    if (next) {
-      closeSwitcher();
-      await openDocument(next.doc_id);
-    }
+    // Never leave the window on a trashed note: move to the most recent one
+    // left, or to a fresh blank note when this was the last, as on first launch.
+    const next = (await mcp.listDocuments()).find((document) => document.doc_id !== row.doc_id);
+    closeSwitcher();
+    await openDocument(next?.doc_id ?? (await editorApi.createDocument("")).doc_id);
+    void docSidebar.refresh();
   }
   return true;
 }
