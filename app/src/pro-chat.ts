@@ -1001,6 +1001,13 @@ export function installProChat(
   });
   listen(retry, "click", () => void loadModels());
   listen(input, "input", renderControls);
+  // Return sends, as in chat apps; Shift-Return adds a line. An input method
+  // still composing keeps Return for itself.
+  listen(input, "keydown", (event) => {
+    if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    if (!send.disabled) void submit();
+  });
   listen(attach, "click", () => attachmentInput.click());
   listen(attachmentInput, "change", () => {
     void stageFiles(Array.from(attachmentInput.files ?? []));

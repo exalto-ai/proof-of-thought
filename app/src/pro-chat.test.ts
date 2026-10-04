@@ -148,6 +148,27 @@ afterEach(() => {
 });
 
 describe("built-in chat", () => {
+  it("sends on Return and keeps Shift-Return for a new line", async () => {
+    const bridge = chatBridge();
+    const controller = installChat({ bridge });
+    controller.setActive(true);
+    controller.setDocument(chatDocument());
+    await chooseOpenAi(bridge);
+    const input = document.querySelector<HTMLTextAreaElement>("#pro-chat-input")!;
+    compose("Question");
+
+    const newline = new KeyboardEvent("keydown", { key: "Enter", shiftKey: true, cancelable: true });
+    input.dispatchEvent(newline);
+    expect(newline.defaultPrevented).toBe(false);
+    expect(bridge.send).not.toHaveBeenCalled();
+
+    const send = new KeyboardEvent("keydown", { key: "Enter", cancelable: true });
+    input.dispatchEvent(send);
+    expect(send.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(bridge.send).toHaveBeenCalledOnce());
+    controller.destroy();
+  });
+
   it("shares the current snapshot with the current disclosure contract", async () => {
     let sent: SendChatRequest | null = null;
     let suggested: ChatSuggestionInput | null = null;
