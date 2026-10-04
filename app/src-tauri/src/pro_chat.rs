@@ -247,7 +247,43 @@ fn checked_json(
     value
 }
 
+/// The ChatGPT plan catalog: a `models` array of `{ slug, display_name,
+/// visibility }`. Only `visibility == "list"` models are offered, in the
+/// server's own order (developers.openai.com/siwc/…/models-and-inference).
+fn parse_plan_models(value: &Value) -> Result<Vec<ProviderModel>, String> {
+    let models = value
+        .get("models")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "ChatGPT returned an invalid model list.".to_string())?
+        .iter()
+        .filter(|entry| entry.get("visibility").and_then(Value::as_str) == Some("list"))
+        .filter_map(|entry| {
+            let slug = entry.get("slug")?.as_str()?;
+            if !safe_id(slug, MAX_MODEL_BYTES) {
+                return None;
+            }
+            let display = entry
+                .get("display_name")
+                .and_then(Value::as_str)
+                .filter(|value| safe_id(value, MAX_MODEL_BYTES))
+                .unwrap_or(slug);
+            Some(ProviderModel {
+                id: slug.to_string(),
+                display_name: display.to_string(),
+            })
+        })
+        .take(MAX_MODELS)
+        .collect::<Vec<_>>();
+    if models.is_empty() {
+        return Err("Your ChatGPT plan offers no models for this app.".into());
+    }
+    Ok(models)
+}
+
 fn parse_models(provider: Provider, value: &Value) -> Result<Vec<ProviderModel>, String> {
+    if provider == Provider::Chatgpt {
+        return parse_plan_models(value);
+    }
     let data = value
         .get("data")
         .and_then(Value::as_array)
@@ -696,6 +732,24 @@ pub async fn send_provider_chat(request: SendChatRequest) -> Result<SendChatResp
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chatgpt_models_come_from_listed_slugs_in_server_order() {
+        let value = json!({ "models": [
+            { "slug": "gpt-b", "display_name": "GPT B", "visibility": "list" },
+            { "slug": "gpt-hidden", "display_name": "Hidden", "visibility": "hide" },
+            { "slug": "gpt-a", "display_name": "GPT A", "visibility": "list" },
+        ]});
+        let models = parse_models(Provider::Chatgpt, &value).unwrap();
+        assert_eq!(
+            models
+                .iter()
+                .map(|m| (m.id.as_str(), m.display_name.as_str()))
+                .collect::<Vec<_>>(),
+            [("gpt-b", "GPT B"), ("gpt-a", "GPT A")]
+        );
+        assert!(parse_models(Provider::Chatgpt, &json!({ "data": [] })).is_err());
+    }
 
     #[test]
     fn chatgpt_requests_stream_without_storing_or_capping_output() {
