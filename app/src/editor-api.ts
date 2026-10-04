@@ -8,6 +8,7 @@ import type {
 } from "./reviewer-connections";
 import type {
   SuggestionDecisionOutcome,
+  SuggestionGroupOutcome,
   SuggestionList,
   SuggestionPosition,
 } from "./suggestions";
@@ -25,6 +26,8 @@ export type ChatSuggestionInput = {
   requestedModel: string;
   reportedModel: string | null;
   change: ChatChange;
+  /** The change this edit is part of, decided as one with the rest of it. */
+  group?: { id: string; label: string };
 };
 
 export class EditorApi implements ReviewerApi {
@@ -77,7 +80,22 @@ export class EditorApi implements ReviewerApi {
         requested_model: input.requestedModel,
         reported_model: input.reportedModel,
         change: input.change,
+        ...(input.group ? { group: input.group } : {}),
       },
+    );
+  }
+
+  acceptSuggestionGroup(docId: string, groupId: string): Promise<SuggestionGroupOutcome> {
+    return this.request(
+      "POST",
+      `/editor/documents/${encodeURIComponent(docId)}/suggestion-groups/${encodeURIComponent(groupId)}/accept`,
+    );
+  }
+
+  rejectSuggestionGroup(docId: string, groupId: string): Promise<SuggestionGroupOutcome> {
+    return this.request(
+      "POST",
+      `/editor/documents/${encodeURIComponent(docId)}/suggestion-groups/${encodeURIComponent(groupId)}/reject`,
     );
   }
 

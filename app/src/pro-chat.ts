@@ -38,7 +38,7 @@ const MAX_PERSISTED_IDENTIFIER_BYTES = 512;
 const MAX_SUGGESTION_METADATA_BYTES = 160;
 const MAX_SUGGESTION_REQUEST_ID_BYTES = 128;
 const MAX_CHANGES = 20;
-const MAX_PREVIEW_CHARS = 60;
+const MAX_PREVIEW_CHARS = 80;
 const STORAGE_PREFIX = "thought.pro-chat.v1.";
 /** Per note, whether chat edits apply directly. Absent means Suggest. */
 const MODE_PREFIX = "thought.pro-chat.mode.v1.";
@@ -90,7 +90,10 @@ export type ChatMode = "suggest" | "edit";
  */
 type ChangeSummary = {
   kind: ChatEdit["kind"];
+  /** The change's name, or for older replies a preview of its text. */
   preview: string;
+  /** How many edits the named change made; absent on older replies. */
+  count?: number;
   suggestion_id?: string;
   applied?: true;
   block_id?: string | null;
@@ -232,7 +235,16 @@ function changeSummary(value: unknown): ChangeSummary | null {
       value.kind !== "delete_block") ||
     typeof value.preview !== "string" || value.preview.length > MAX_PREVIEW_CHARS + 1
   ) return null;
-  const summary = { kind: value.kind as ChatEdit["kind"], preview: value.preview };
+  if (
+    value.count !== undefined &&
+    (typeof value.count !== "number" || !Number.isSafeInteger(value.count) || value.count < 1 ||
+      value.count > MAX_CHANGES)
+  ) return null;
+  const summary = {
+    kind: value.kind as ChatEdit["kind"],
+    preview: value.preview,
+    ...(typeof value.count === "number" ? { count: value.count } : {}),
+  };
   if (value.applied === true && value.suggestion_id === undefined) {
     if (value.block_id !== null && value.block_id !== undefined && !storedIdentifier(value.block_id)) {
       return null;
@@ -241,14 +253,6 @@ function changeSummary(value: unknown): ChangeSummary | null {
   }
   if (value.applied !== undefined || value.block_id !== undefined) return null;
   return storedIdentifier(value.suggestion_id) ? { ...summary, suggestion_id: value.suggestion_id } : null;
-}
-
-/** The first line of some Markdown as plain words, shortened for a link. */
-function preview(markdown: string): string {
-  const line = markdown.split("\n").map((part) => part.trim()).find(Boolean) ?? "";
-  const plain = line.replace(/^(#{1,6}\s+|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+|>\s*)/, "")
-    .replace(/[*_`~]/g, "");
-  return plain.length > MAX_PREVIEW_CHARS ? `${plain.slice(0, MAX_PREVIEW_CHARS).trimEnd()}…` : plain;
 }
 
 const PENDING_VERBS: Record<ChatEdit["kind"], string> = {
@@ -714,9 +718,11 @@ export function installProChat(
       const changes = root.createElement("div");
       changes.className = "pro-chat-changes";
       for (const change of message.changes) {
-        const label = change.preview
-          ? `${CHANGE_VERBS[change.kind]}: ${change.preview}`
-          : CHANGE_VERBS[change.kind];
+        const label = change.count !== undefined
+          ? change.count > 1 ? `${change.preview} · ${change.count} edits` : change.preview
+          : change.preview
+            ? `${CHANGE_VERBS[change.kind]}: ${change.preview}`
+            : CHANGE_VERBS[change.kind];
         const target = change.applied ? change.block_id : change.suggestion_id;
         const decided = change.suggestion_id === undefined
           ? undefined
@@ -1143,15 +1149,16 @@ export function installProChat(
       if (destroyed || generation !== requestGeneration || currentDocument?.id !== document.id) {
         return;
       }
+      const made = changes.reduce((sum, { count }) => sum + (count ?? 1), 0);
       const text = chatResponse.text.trim()
         ? chatResponse.text
         : mode === "edit"
-          ? changes.length === 0
+          ? made === 0
             ? "Could not edit the note."
-            : changes.length === 1 ? "Edited the note." : `Made ${changes.length} edits.`
-          : changes.length === 0
+            : made === 1 ? "Edited the note." : `Made ${made} edits.`
+          : made === 0
             ? "Could not suggest the edits."
-            : changes.length === 1 ? "Suggested an edit." : `Suggested ${changes.length} edits.`;
+            : made === 1 ? "Suggested an edit." : `Suggested ${made} edits.`;
       messages.push(
         {
           role: "user",
@@ -1204,11 +1211,14 @@ export function installProChat(
     if (!(await document.waitUntilSaved())) {
       throw new Error("Wait for this note to finish saving, then try again.");
     }
-    const changes: ChangeSummary[] = [];
+    // One link, and in Suggest one decision, per change the model named.
+    const changes = new Map<string, ChangeSummary>();
     const failures: string[] = [];
     for (const [index, edit] of chatResponse.edits.slice(0, MAX_CHANGES).entries()) {
       const change = chatChange(edit, blockIds);
       if (change === null) continue;
+      const name = edit.change?.trim() || "Edit the note";
+      const group = changes.get(name);
       const input: ChatSuggestionInput = {
         documentId: document.id,
         requestId: `${requestId}.${index}`,
@@ -1216,18 +1226,28 @@ export function installProChat(
         requestedModel: chatResponse.requested_model,
         reportedModel: chatResponse.reported_model,
         change,
-      };
-      const summary = {
-        kind: edit.kind,
-        preview: preview(edit.kind === "delete_block" ? edit.original : edit.markdown),
+        group: { id: `${requestId}.g${[...changes.keys(), name].indexOf(name)}`, label: name },
       };
       try {
         if (apply) {
-          const outcome = await apply(input);
-          changes.push({ ...summary, applied: true, block_id: outcome.block_id });
+          const { block_id } = await apply(input);
+          if (group) {
+            group.count = (group.count ?? 0) + 1;
+            group.block_id ??= block_id;
+          } else {
+            changes.set(name, { kind: edit.kind, preview: name, count: 1, applied: true, block_id });
+          }
         } else {
           const outcome = await options.suggestEdit!(input);
-          changes.push({ ...summary, suggestion_id: outcome.suggestion.suggestion_id });
+          if (group) group.count = (group.count ?? 0) + 1;
+          else {
+            changes.set(name, {
+              kind: edit.kind,
+              preview: name,
+              count: 1,
+              suggestion_id: outcome.suggestion.suggestion_id,
+            });
+          }
         }
       } catch (cause) {
         failures.push(oneLine(cause, "The note could not be changed."));
@@ -1238,7 +1258,7 @@ export function installProChat(
       const verb = apply ? "make" : "suggest";
       setError(`Could not ${verb} ${count}: ${failures[0]}`);
     }
-    return changes;
+    return [...changes.values()];
   }
 
   if (modeSelect) {

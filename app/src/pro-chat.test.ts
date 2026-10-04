@@ -237,10 +237,10 @@ describe("built-in chat", () => {
       send: vi.fn().mockResolvedValue({
         text: "",
         edits: [
-          { kind: "replace_block", block: 0, markdown: "## A firmer *ending*", original: "Ending" },
-          { kind: "delete_block", block: 0, original: "Ending" },
+          { kind: "replace_block", block: 0, markdown: "## A firmer *ending*", original: "Ending", change: "A firmer ending" },
+          { kind: "delete_block", block: 0, original: "Ending", change: "A firmer ending" },
           // The trailing paragraph is not saved yet: replacing it adds instead.
-          { kind: "replace_block", block: 1, markdown: "Coda", original: "" },
+          { kind: "replace_block", block: 1, markdown: "Coda", original: "", change: "Add a coda" },
         ],
         provider: "openai",
         requested_model: "gpt-test",
@@ -267,6 +267,11 @@ describe("built-in chat", () => {
     submitChat();
 
     await vi.waitFor(() => expect(document.querySelectorAll(".pro-chat-change")).toHaveLength(2));
+    expect(suggestEdit.mock.calls.map(([input]) => input.group)).toEqual([
+      { id: "one.g0", label: "A firmer ending" },
+      { id: "one.g0", label: "A firmer ending" },
+      { id: "one.g1", label: "Add a coda" },
+    ]);
     expect(suggestEdit.mock.calls.map(([input]) => [input.requestId, input.change])).toEqual([
       ["one.0", {
         kind: "replace_block",
@@ -280,7 +285,7 @@ describe("built-in chat", () => {
     expect(document.querySelector("#pro-chat-error")?.textContent)
       .toContain("Could not suggest an edit: That part of the note changed.");
     const links = [...document.querySelectorAll<HTMLButtonElement>(".pro-chat-change")];
-    expect(links.map((link) => link.textContent)).toEqual(["Edit: A firmer ending", "Edit: Coda"]);
+    expect(links.map((link) => link.textContent)).toEqual(["A firmer ending", "Add a coda"]);
     expect(document.querySelector("#pro-chat-messages")?.textContent).toContain("Suggested 2 edits.");
     links[1].click();
     expect(focusSuggestion).toHaveBeenCalledWith("pro-chat:openai:one.2");
@@ -303,7 +308,7 @@ describe("built-in chat", () => {
     controller = installChat({ bridge, suggestEdit, focusSuggestion });
     controller.setDocument(chatDocument());
     expect([...document.querySelectorAll(".pro-chat-change")].map((link) => link.textContent))
-      .toEqual(["Edit: A firmer ending", "Edit: Coda"]);
+      .toEqual(["A firmer ending", "Add a coda"]);
     controller.destroy();
   });
 
@@ -381,8 +386,8 @@ describe("built-in chat", () => {
       send: vi.fn().mockResolvedValue({
         text: "",
         edits: [
-          { kind: "replace_block", block: 0, markdown: "Firmer", original: "Ending" },
-          { kind: "delete_block", block: 0, original: "Ending" },
+          { kind: "replace_block", block: 0, markdown: "Firmer", original: "Ending", change: "Tighten" },
+          { kind: "delete_block", block: 0, original: "Ending", change: "Tighten" },
         ],
         provider: "openai",
         requested_model: "gpt-test",
@@ -413,13 +418,13 @@ describe("built-in chat", () => {
     await chooseOpenAi(bridge);
     compose("Tighten it");
     submitChat();
-    await vi.waitFor(() => expect(document.querySelectorAll(".pro-chat-change")).toHaveLength(2));
+    await vi.waitFor(() => expect(document.querySelectorAll(".pro-chat-change")).toHaveLength(1));
     expect(suggestEdit).not.toHaveBeenCalled();
     expect(applyEdit.mock.calls.map(([input]) => input.change.kind))
       .toEqual(["replace_block", "delete_block"]);
     expect(document.querySelector("#pro-chat-messages")?.textContent).toContain("Made 2 edits.");
-    const [edited, deleted] = document.querySelectorAll<HTMLElement>(".pro-chat-change");
-    expect(deleted.tagName).toBe("SPAN");
+    const [edited] = document.querySelectorAll<HTMLElement>(".pro-chat-change");
+    expect(edited.textContent).toBe("Tighten · 2 edits");
     edited.click();
     expect(focusBlock).toHaveBeenCalledWith("1:9");
     controller.destroy();

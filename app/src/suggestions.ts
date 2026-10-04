@@ -47,6 +47,8 @@ export type SuggestionRecord = {
   };
   base_content_revision: string;
   patch: SuggestionPatch;
+  /** Suggestions decided together, such as every edit of one rewrite. */
+  group?: { id: string; label: string };
   explanation: string | null;
   state: SuggestionState;
   decision: { actor_id: string; actor_label: string; decided_at: number } | null;
@@ -63,10 +65,14 @@ export type SuggestionDecisionOutcome = {
   suggestion: SuggestionRecord;
 };
 
+export type SuggestionGroupOutcome = { suggestions: SuggestionRecord[] };
+
 export type SuggestionClient = {
   listSuggestions(documentId: string): Promise<SuggestionList>;
   acceptSuggestion(documentId: string, suggestionId: string): Promise<SuggestionDecisionOutcome>;
   rejectSuggestion(documentId: string, suggestionId: string): Promise<SuggestionDecisionOutcome>;
+  acceptSuggestionGroup(documentId: string, groupId: string): Promise<SuggestionGroupOutcome>;
+  rejectSuggestionGroup(documentId: string, groupId: string): Promise<SuggestionGroupOutcome>;
 };
 
 export type SuggestionReviewController = {
@@ -306,6 +312,22 @@ export function installSuggestionReview(
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   let refreshRequiresSave = false;
 
+  /** The visible suggestions decided together with this one, itself included. */
+  function members(suggestion: SuggestionRecord): SuggestionRecord[] {
+    const group = suggestion.group?.id;
+    if (!group) return [suggestion];
+    return [...suggestions.values()].filter((other) =>
+      other.group?.id === group && (other.state === "pending" || other.state === "stale"));
+  }
+
+  /** Whether this suggestion is the active one, or decided together with it. */
+  function highlighted(suggestion: SuggestionRecord): boolean {
+    if (active === null) return false;
+    if (active === suggestion.suggestion_id) return true;
+    const group = suggestions.get(active)?.group?.id;
+    return group !== undefined && suggestion.group?.id === group;
+  }
+
   function activate(id: string | null): void {
     if (active === id) return;
     active = id;
@@ -386,7 +408,7 @@ export function installSuggestionReview(
   /** Proposed blocks rendered as the editor would render them. */
   function insertedBlocks(suggestion: SuggestionRecord, nodes: SuggestionNode[]): HTMLElement {
     const container = marked(document.createElement("div"), suggestion);
-    container.className = `suggestion-inserted${active === suggestion.suggestion_id ? " is-active" : ""}`;
+    container.className = `suggestion-inserted${highlighted(suggestion) ? " is-active" : ""}`;
     container.setAttribute("contenteditable", "false");
     try {
       const fragment = Fragment.fromJSON(editor.schema, nodes);
@@ -405,7 +427,7 @@ export function installSuggestionReview(
 
   function insertedWords(suggestion: SuggestionRecord, text: string): HTMLElement {
     const span = marked(document.createElement("span"), suggestion);
-    span.className = `suggestion-inserted-text${active === suggestion.suggestion_id ? " is-active" : ""}`;
+    span.className = `suggestion-inserted-text${highlighted(suggestion) ? " is-active" : ""}`;
     span.textContent = text.split("\uFFFC").join("");
     span.addEventListener("mousedown", (event) => {
       event.preventDefault();
@@ -432,15 +454,25 @@ export function installSuggestionReview(
   }
 
   function fillCard(suggestion: SuggestionRecord): void {
-    card.dataset.state = suggestion.state;
+    const together = members(suggestion);
+    // A group is one decision: any stale member makes all of it stale.
+    const stale = together.some(({ state }) => state === "stale");
+    card.dataset.state = stale ? "stale" : "pending";
     card.setAttribute("aria-label", `Suggestion from ${suggestion.proposer.label}`);
     const heading = document.createElement("div");
     heading.className = "suggestion-popover-head";
     const name = document.createElement("strong");
-    name.textContent = suggestion.proposer.label;
+    name.textContent = suggestion.group?.label ?? suggestion.proposer.label;
+    if (suggestion.group) {
+      name.title = suggestion.proposer.label;
+      const count = document.createElement("span");
+      count.className = "suggestion-count";
+      count.textContent = together.length === 1 ? "1 edit" : `${together.length} edits`;
+      name.append(count);
+    }
     const actions = document.createElement("div");
     actions.className = "suggestion-actions";
-    if (suggestion.state === "pending") actions.append(actionButton(suggestion, "accept"));
+    if (!stale) actions.append(actionButton(suggestion, "accept"));
     actions.append(actionButton(suggestion, "reject"));
     heading.append(name, actions);
     card.replaceChildren(heading);
@@ -451,11 +483,11 @@ export function installSuggestionReview(
       explanation.textContent = suggestion.explanation;
       card.append(explanation);
     }
-    if (suggestion.state === "stale") {
-      const stale = document.createElement("p");
-      stale.className = "suggestion-stale-note";
-      stale.textContent = "The note changed after this was suggested.";
-      card.append(stale);
+    if (stale) {
+      const note = document.createElement("p");
+      note.className = "suggestion-stale-note";
+      note.textContent = "The note changed after this was suggested.";
+      card.append(note);
     }
     const error = errors.get(suggestion.suggestion_id);
     if (error) {
@@ -473,7 +505,7 @@ export function installSuggestionReview(
     index: number,
   ): Decoration[] {
     const id = suggestion.suggestion_id;
-    const isActive = active === id;
+    const isActive = highlighted(suggestion);
     const attributes = (className: string) => ({
       class: `${className}${isActive ? " is-active" : ""}`,
       "data-suggestion-id": id,
@@ -554,11 +586,16 @@ export function installSuggestionReview(
       if (options.beforeDecision && !(await options.beforeDecision())) {
         throw new Error("Wait for this document to finish saving, then try again.");
       }
-      const outcome = kind === "accept"
-        ? await client.acceptSuggestion(documentId, suggestion.suggestion_id)
-        : await client.rejectSuggestion(documentId, suggestion.suggestion_id);
+      const group = suggestion.group?.id;
+      const decided = group
+        ? (kind === "accept"
+          ? await client.acceptSuggestionGroup(documentId, group)
+          : await client.rejectSuggestionGroup(documentId, group)).suggestions
+        : [(kind === "accept"
+          ? await client.acceptSuggestion(documentId, suggestion.suggestion_id)
+          : await client.rejectSuggestion(documentId, suggestion.suggestion_id)).suggestion];
       if (destroyed) return;
-      suggestions.set(outcome.suggestion.suggestion_id, outcome.suggestion);
+      for (const record of decided) suggestions.set(record.suggestion_id, record);
       editor.commands.focus();
     } catch (error) {
       if (!destroyed) {

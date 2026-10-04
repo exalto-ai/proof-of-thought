@@ -30,12 +30,13 @@ export type EditAnchor = { kind: "start" } | { kind: "end" } | { kind: "block"; 
 /**
  * One edit the model made with its tools. `block` indexes the note's
  * top-level blocks as sent; `original` is that block's Markdown as the model
- * saw it.
+ * saw it; `change` names the change it is part of, decided as one.
  */
-export type ChatEdit =
+export type ChatEdit = { change: string } & (
   | { kind: "replace_block"; block: number; markdown: string; original: string }
   | { kind: "insert_blocks"; after: EditAnchor; markdown: string }
-  | { kind: "delete_block"; block: number; original: string };
+  | { kind: "delete_block"; block: number; original: string }
+);
 
 export type SendChatResponse = {
   text: string;

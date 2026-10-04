@@ -82,6 +82,8 @@ function client(record: SuggestionRecord): SuggestionClient {
       content_revision: "revision",
       suggestion: { ...record, state: "rejected" as const },
     })),
+    acceptSuggestionGroup: vi.fn(async () => ({ suggestions: [{ ...record, state: "accepted" as const }] })),
+    rejectSuggestionGroup: vi.fn(async () => ({ suggestions: [{ ...record, state: "rejected" as const }] })),
   };
 }
 

@@ -1299,6 +1299,11 @@ body.settings-page {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.suggestion-count {
+  margin-left: 6px;
+  color: var(--ink-faint);
+  font-weight: 400;
+}
 .suggestion-explanation,
 .suggestion-stale-note,
 .suggestion-error { margin: 4px 4px 2px 0; }
