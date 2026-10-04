@@ -31,7 +31,9 @@ describe("theme palettes", () => {
   it("defines every dark token for light as well", () => {
     const dark = names(block(":root {"));
     const light = names(block(':root[data-theme="light"]'));
-    const themed = dark.filter((name) => !["--sans", "--display", "--mono", "--measure", "--chrome-height"].includes(name));
+    // Typography and layout are the same in both themes.
+    const layout = ["--sans", "--display", "--mono", "--measure", "--chrome-height", "--window-buttons-end"];
+    const themed = dark.filter((name) => !layout.includes(name));
     expect(light.sort()).toEqual(themed.sort());
   });
 });
