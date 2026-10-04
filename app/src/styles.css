@@ -167,7 +167,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 /* With a sidebar hidden, the editor's strip makes room for what is pinned
    over that corner: the window buttons and toggle, or the AI toggle. */
 .workspace:has(> #doc-sidebar[hidden]) .chrome {
-  padding-left: calc(var(--window-buttons-end) + 40px);
+  padding-left: calc(var(--window-buttons-end) + 70px);
 }
 .workspace:has(> #ai-support-sidebar[hidden]) .chrome { padding-right: 52px; }
 .presence { display: flex; gap: 4px; margin-left: auto; }
@@ -317,68 +317,30 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   gap: 6px;
   padding: 0 10px 6px;
 }
-/* A Mac search field: filled, rounded, with the glass inside. */
-.search-field {
-  position: relative;
+/* + New Note: a full-width row at the top of the list. */
+.new-note {
   flex: 1;
-  min-width: 0;
   display: flex;
   align-items: center;
-}
-.search-field svg {
-  position: absolute;
-  left: 7px;
-  width: 13px;
-  height: 13px;
-  fill: none;
-  stroke: var(--ink-faint);
-  stroke-width: 2;
-  stroke-linecap: round;
-  pointer-events: none;
-}
-#doc-filter {
-  width: 100%;
-  height: 26px;
-  padding: 0 8px 0 25px;
-  border: 0;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--rule);
   border-radius: 7px;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  background: var(--raised);
   color: var(--ink);
-  font: 13px/1 var(--sans);
-}
-#doc-filter::placeholder { color: var(--ink-faint); }
-#doc-filter::-webkit-search-decoration { display: none; }
-#doc-filter:focus {
-  outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  outline-offset: 0;
-}
-.doc-new {
-  flex: 0 0 auto;
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink-soft);
+  font: 500 13px var(--sans);
   cursor: default;
 }
-.doc-new:hover,
-.doc-new:focus-visible {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  outline: none;
-}
-.doc-new svg {
-  width: 16px;
-  height: 16px;
+.new-note:hover { background: color-mix(in srgb, var(--ink) 6%, var(--raised)); }
+.new-note:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.new-note svg {
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.7;
+  stroke-width: 2;
   stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .doc-list[hidden] { display: none; }
 .doc-list {
@@ -423,6 +385,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .doc-row-title { font: 500 13px/1.35 var(--sans); }
 .doc-row-date { color: var(--ink-faint); font-size: 11.5px; }
 #doc-sidebar-toggle { left: var(--window-buttons-end); }
+#doc-search { left: calc(var(--window-buttons-end) + 30px); }
 #ai-support-toggle { right: 10px; }
 .ai-sidebar h3 {
   margin: 0;

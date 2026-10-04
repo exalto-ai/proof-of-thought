@@ -57,16 +57,14 @@ describe("document grouping", () => {
 describe("document sidebar", () => {
   function install(documents: DocumentListing[]) {
     const open = vi.fn();
-    const search = vi.fn().mockResolvedValue([{ doc_id: "b", title: "Budget" }]);
     const controller = installDocumentSidebar(document, {
       storage: memoryStorage(),
       list: vi.fn().mockResolvedValue(documents),
-      search,
       open,
       create: vi.fn(),
       now: () => NOW,
     });
-    return { controller, open, search };
+    return { controller, open };
   }
 
   it("lists documents, marks the open one, and opens a row on click", async () => {
@@ -95,13 +93,12 @@ describe("document sidebar", () => {
     controller.destroy();
   });
 
-  it("shows a centred empty state with New Note, or No Results for a search", async () => {
+  it("shows a centred empty state with New Note when there are no notes", async () => {
     vi.useFakeTimers();
     const create = vi.fn();
     const controller = installDocumentSidebar(document, {
       storage: memoryStorage(),
       list: vi.fn().mockResolvedValue([]),
-      search: vi.fn().mockResolvedValue([]),
       open: vi.fn(),
       create,
       now: () => NOW,
@@ -116,12 +113,6 @@ describe("document sidebar", () => {
     action.click();
     expect(create).toHaveBeenCalledOnce();
 
-    const filter = document.querySelector<HTMLInputElement>("#doc-filter")!;
-    filter.value = "zzz";
-    filter.dispatchEvent(new Event("input"));
-    await vi.advanceTimersByTimeAsync(150);
-    expect(document.querySelector("#doc-list-empty-title")!.textContent).toBe("No Results");
-    expect(action.hidden).toBe(true);
     controller.destroy();
   });
 
@@ -131,7 +122,6 @@ describe("document sidebar", () => {
     const controller = installDocumentSidebar(document, {
       storage: memoryStorage(),
       list: vi.fn().mockResolvedValue([doc("a", NOW, "Plan")]),
-      search: vi.fn(),
       open: vi.fn(),
       create: vi.fn(),
       showMenu,
@@ -150,19 +140,5 @@ describe("document sidebar", () => {
     controller.destroy();
   });
 
-  it("filters through search and opens the first result on Enter", async () => {
-    vi.useFakeTimers();
-    const { controller, open, search } = install([doc("a", NOW, "Plan")]);
-    await controller.refresh();
-    const filter = document.querySelector<HTMLInputElement>("#doc-filter")!;
-    filter.value = "bud";
-    filter.dispatchEvent(new Event("input"));
-    await vi.advanceTimersByTimeAsync(150);
 
-    expect(search).toHaveBeenCalledWith("bud");
-    expect(document.querySelector(".doc-group")!.textContent).toBe("Results");
-    filter.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
-    expect(open).toHaveBeenCalledWith("b");
-    controller.destroy();
-  });
 });

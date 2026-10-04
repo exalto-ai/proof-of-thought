@@ -14,6 +14,7 @@
   <body>
     <!-- Pinned in the title-bar row, beside the window buttons and in the
          top-right corner, whether or not their sidebars are showing. -->
+    <button class="panel-toggle" id="doc-search" type="button" aria-label="Search notes" title="Search notes (⌘K)"></button>
     <button class="panel-toggle" id="doc-sidebar-toggle" type="button" aria-controls="doc-sidebar" aria-expanded="false" aria-label="documents sidebar" title="Show documents sidebar"></button>
     <button class="panel-toggle" id="ai-support-toggle" type="button" aria-controls="ai-support-sidebar" aria-expanded="false" aria-label="AI sidebar" title="Show AI sidebar"></button>
 
@@ -21,10 +22,7 @@
       <aside class="side-panel doc-sidebar" id="doc-sidebar" data-side-panel aria-label="Documents" tabindex="-1" hidden>
         <div class="titlebar" data-tauri-drag-region></div>
         <div class="doc-sidebar-header">
-          <label class="search-field">
-            <input type="search" id="doc-filter" placeholder="Search" aria-label="Search documents" autocomplete="off" spellcheck="false" />
-          </label>
-          <button class="doc-new" id="doc-new" type="button" aria-label="New document" title="New document"></button>
+          <button class="new-note" id="doc-new" type="button" title="New Note (⌘N)">New Note</button>
         </div>
         <nav class="doc-list" id="doc-list" aria-label="Documents"></nav>
         <div class="empty-state" id="doc-list-empty" hidden>

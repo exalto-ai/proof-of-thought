@@ -10,6 +10,7 @@ import { Awareness } from "y-protocols/awareness";
 import type { Editor } from "@tiptap/core";
 import { installAiSupport } from "./ai-support";
 import { installDocumentSidebar } from "./doc-sidebar";
+import { ICONS, icon } from "./icons";
 import { createEditor } from "./editor";
 import { EditorApi } from "./editor-api";
 import { installCurrentSources } from "./current-sources";
@@ -99,13 +100,17 @@ const docSidebar = installDocumentSidebar(document, {
   storage: safeLocalStorage(),
   // Both run only after boot has connected; until then there is nothing to list.
   list: async () => (mcp ? mcp.listDocuments(500) : []),
-  search: async (query) => (mcp ? mcp.search(query) : []),
   open: (docId) => openDocument(docId),
   create: () => createNewDocument(),
   // Native menus exist only in the app; the browser keeps its own.
   showMenu: isTauri() ? showDocumentMenu : undefined,
   onNotice: notify,
 });
+
+// The title-bar search icon opens the ⌘K switcher, the one search there is.
+const docSearch = document.getElementById("doc-search")!;
+docSearch.replaceChildren(icon(ICONS.search));
+docSearch.addEventListener("click", () => openSwitcher());
 
 async function visibleWordingRevision(): Promise<string | null> {
   const current = open;

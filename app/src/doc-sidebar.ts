@@ -6,7 +6,6 @@ export const DOC_SIDEBAR_OPEN_STORAGE_KEY = "thought.doc-sidebar-open.v1";
 export const DOC_SIDEBAR_WIDTH_STORAGE_KEY = "thought.doc-sidebar-width.v1";
 
 const DAY_MS = 86_400_000;
-const FILTER_DELAY_MS = 150;
 const SAVED_REFRESH_DELAY_MS = 1000;
 
 export type DocumentListing = { doc_id: string; title: string; updated_at: number };
@@ -16,7 +15,6 @@ export type DocumentGroup = { label: string; documents: DocumentListing[] };
 type Options = {
   storage: Storage | null;
   list(): Promise<DocumentListing[]>;
-  search(query: string): Promise<Array<{ doc_id: string; title: string }>>;
   open(docId: string): unknown;
   create(): unknown;
   /** Show a menu for a row; resolves when the menu closes. */
@@ -82,14 +80,13 @@ export function rowDate(at: number, now: number): string {
 /**
  * The left sidebar: every document, newest first. Documents are a flat set
  * named by their own first line (folders are an MVP non-goal), so this is a
- * recency-grouped list with a filter rather than a tree.
+ * recency-grouped list rather than a tree. Search is the ⌘K switcher.
  */
 export function installDocumentSidebar(
   root: Document,
   options: Options,
 ): DocumentSidebarController {
   const sidebar = required<HTMLElement>(root, "#doc-sidebar", "documents sidebar");
-  const filter = required<HTMLInputElement>(root, "#doc-filter", "documents sidebar");
   const list = required<HTMLElement>(root, "#doc-list", "documents sidebar");
   const empty = required<HTMLElement>(root, "#doc-list-empty", "documents sidebar");
   const emptyTitle = required<HTMLElement>(root, "#doc-list-empty-title", "documents sidebar");
@@ -98,15 +95,12 @@ export function installDocumentSidebar(
   const now = options.now ?? Date.now;
   const disposers: Array<() => void> = [];
   let documents: DocumentListing[] = [];
-  let results: Array<{ doc_id: string; title: string }> | null = null;
   let current: string | null = null;
   let request = 0;
-  let filterTimer: number | null = null;
   let renderTimer: number | null = null;
   let refreshTimer: number | null = null;
 
-  create.append(icon(ICONS.filePlus));
-  filter.before(icon(ICONS.search));
+  create.prepend(icon(ICONS.plus));
 
   const panel = installSidePanel(root, {
     storage: options.storage,
@@ -168,11 +162,6 @@ export function installDocumentSidebar(
   }
 
   function render() {
-    if (results !== null) {
-      list.replaceChildren(...(results.length ? [section("Results", results.map(row))] : []));
-      showEmpty(results.length === 0, "No Results", false);
-      return;
-    }
     list.replaceChildren(
       ...groupDocuments(documents, now()).map((group) =>
         section(group.label, group.documents.map(row))
@@ -193,17 +182,9 @@ export function installDocumentSidebar(
   async function refresh() {
     const ticket = ++request;
     try {
-      const query = filter.value.trim();
-      if (query) {
-        const hits = await options.search(query);
-        if (ticket !== request) return;
-        results = hits;
-      } else {
-        const listed = await options.list();
-        if (ticket !== request) return;
-        documents = listed;
-        results = null;
-      }
+      const listed = await options.list();
+      if (ticket !== request) return;
+      documents = listed;
       render();
     } catch (error) {
       if (ticket !== request) return;
@@ -241,26 +222,7 @@ export function installDocumentSidebar(
     const index = all.indexOf(root.activeElement as HTMLButtonElement);
     if (index < 0) return;
     event.preventDefault();
-    if (key === "ArrowUp" && index === 0) filter.focus();
-    else all[Math.min(all.length - 1, Math.max(0, index + (key === "ArrowDown" ? 1 : -1)))]?.focus();
-  });
-  listen(filter, "keydown", (event) => {
-    const key = (event as KeyboardEvent).key;
-    if (key === "ArrowDown") {
-      event.preventDefault();
-      rows()[0]?.focus();
-    } else if (key === "Enter") {
-      event.preventDefault();
-      const first = rows()[0]?.dataset.docId;
-      if (first) void options.open(first);
-    }
-  });
-  listen(filter, "input", () => {
-    if (filterTimer !== null) clearTimeout(filterTimer);
-    filterTimer = window.setTimeout(() => {
-      filterTimer = null;
-      void refresh();
-    }, FILTER_DELAY_MS);
+    all[Math.min(all.length - 1, Math.max(0, index + (key === "ArrowDown" ? 1 : -1)))]?.focus();
   });
   listen(create, "click", () => void options.create());
   listen(emptyNew, "click", () => void options.create());
@@ -292,7 +254,6 @@ export function installDocumentSidebar(
     },
     destroy() {
       for (const dispose of disposers.splice(0)) dispose();
-      if (filterTimer !== null) clearTimeout(filterTimer);
       if (renderTimer !== null) clearTimeout(renderTimer);
       if (refreshTimer !== null) clearTimeout(refreshTimer);
       panel.destroy();

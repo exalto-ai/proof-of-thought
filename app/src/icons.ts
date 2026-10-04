@@ -24,6 +24,10 @@ export const ICONS = {
     ["path", { d: "M9 15h6" }],
     ["path", { d: "M12 18v-6" }],
   ],
+  plus: [
+    ["path", { d: "M5 12h14" }],
+    ["path", { d: "M12 5v14" }],
+  ],
   arrowUp: [
     ["path", { d: "m5 12 7-7 7 7" }],
     ["path", { d: "M12 19V5" }],
