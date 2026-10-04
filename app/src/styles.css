@@ -625,14 +625,21 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   white-space: nowrap;
 }
 
-/* Agent and Proof: one pane at a time, under a segmented control in its own
-   row below the title bar, so it has room to breathe. */
+/* Agent and Proof: one pane at a time, under a segmented control lifted to
+   overlap the foot of the title-bar row (about 11px from the window's top):
+   clear of the edge without floating far below it. The row lets presses
+   through so the strip around the control still drags the window. */
 .sidebar-tabs-row {
+  position: relative;
+  z-index: 1;
   flex: 0 0 auto;
   display: flex;
   justify-content: center;
-  padding: 2px 16px 8px;
+  margin-top: -20px;
+  padding: 0 44px 8px;
+  pointer-events: none;
 }
+.sidebar-tabs { pointer-events: auto; }
 .sidebar-tabs {
   display: inline-flex;
   padding: 2px;
