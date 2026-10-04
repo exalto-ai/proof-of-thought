@@ -623,13 +623,13 @@ fn ensure_daemon() -> Result<Daemon, String> {
     // dead-row cleanup as well as at both live-process signal boundaries, so
     // removing discovery can never bypass a fail-closed schema decision.
     if let Some(published) = discovery::read_published()
-        && (1..=discovery::PROTOCOL_VERSION).contains(&published.protocol_version)
+        && discovery::known_protocol(published.protocol_version)
         && published.store == default_store
     {
         published_store_is_upgradeable(&published, &default_store, &discovery_path)?;
     }
 
-    if discovery::discovery_path().exists()
+    if discovery_path.exists()
         && discovery::remove_definitively_stale_discovery()
             .map_err(|error| format!("could not remove stale daemon discovery: {error}"))?
     {

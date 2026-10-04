@@ -96,11 +96,6 @@ impl MutationContext {
         }
     }
 
-    pub fn with_alignment(mut self, alignment: Alignment) -> Self {
-        self.alignment = alignment;
-        self
-    }
-
     pub fn source(&self, id: SourceId) -> SourceDescriptor {
         SourceDescriptor::new(
             id,

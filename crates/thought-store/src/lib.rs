@@ -1114,16 +1114,6 @@ impl Store {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
-
-    /// Cache of the tombstone that actually lives in the document CRDT (AD-14).
-    /// A column cannot replicate, so this is derived state, never the source.
-    pub fn cache_deleted_at(&self, doc_id: &str, at: Option<i64>) -> Result<(), SqlError> {
-        self.conn.execute(
-            "UPDATE documents SET deleted_at = ?2 WHERE id = ?1",
-            params![doc_id, at],
-        )?;
-        Ok(())
-    }
 }
 
 fn insert_event(

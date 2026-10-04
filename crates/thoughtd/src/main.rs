@@ -1,8 +1,8 @@
 //! The Thought daemon.
 //!
 //! Owns the CRDT documents and the SQLite store, and serves them to agents over
-//! MCP. The UI, when it exists, will be one more client of this process rather
-//! than the place the documents live (AD-2) — which is what lets an agent edit
+//! MCP. The window is one more client of this process rather than the place
+//! the documents live (AD-2) — which is what lets an agent edit
 //! a document with no window open.
 //!
 //! Transport is HTTP on loopback, never stdio (AD-10). A stdio MCP server would

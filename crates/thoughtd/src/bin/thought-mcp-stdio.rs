@@ -95,7 +95,7 @@ fn require_published_store_compatibility() -> Result<(), Box<dyn std::error::Err
         return Ok(());
     };
     if published.store != discovery::default_db_path()
-        || !(1..=discovery::PROTOCOL_VERSION).contains(&published.protocol_version)
+        || !discovery::known_protocol(published.protocol_version)
     {
         return Ok(());
     }

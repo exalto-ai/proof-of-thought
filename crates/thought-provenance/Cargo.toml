@@ -8,6 +8,3 @@ license.workspace = true
 [dependencies]
 serde = { workspace = true }
 unicode-segmentation = "1.13"
-
-[dev-dependencies]
-serde_json = { workspace = true }

@@ -61,14 +61,14 @@ impl HealthResponse {
     }
 }
 
-/// `THOUGHT_HOME` overrides the location of the store and the discovery file.
-/// Without it, a test run would publish itself as *the* daemon and overwrite
-/// the real one's port and token.
 /// Where the store, the discovery file and the logs live.
 pub fn home() -> PathBuf {
     support_dir()
 }
 
+/// `THOUGHT_HOME` overrides the location of the store and the discovery file.
+/// Without it, a test run would publish itself as *the* daemon and overwrite
+/// the real one's port and token.
 fn support_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("THOUGHT_HOME") {
         return PathBuf::from(dir);
@@ -99,7 +99,6 @@ pub fn discovery_path() -> PathBuf {
 /// the end hangs forever while consuming memory. The daemon did exactly that
 /// before it could log a single line.
 pub fn random_token() -> io::Result<String> {
-    use std::io::Read;
     let mut buf = [0u8; 32];
     std::fs::File::open("/dev/urandom")?.read_exact(&mut buf)?;
     Ok(buf.iter().map(|b| format!("{b:02x}")).collect())
@@ -181,21 +180,22 @@ fn local_agent() -> ureq::Agent {
         .into()
 }
 
-fn probe_identity(daemon: &Daemon) -> bool {
-    let Some(url) = health_url(daemon, IDENTITY_PATH) else {
-        return false;
-    };
-    let Ok(mut response) = local_agent()
-        .get(&url)
+/// The public identity body, sent and read without any capability.
+fn public_identity_body(url: &str) -> Option<String> {
+    let mut response = local_agent()
+        .get(url)
         .header("Accept", "application/json")
         .call()
-    else {
-        return false;
-    };
+        .ok()?;
     if response.status().as_u16() != 200 {
-        return false;
+        return None;
     }
-    let Ok(body) = response.body_mut().read_to_string() else {
+    response.body_mut().read_to_string().ok()
+}
+
+fn probe_identity(daemon: &Daemon) -> bool {
+    let Some(body) = health_url(daemon, IDENTITY_PATH).and_then(|url| public_identity_body(&url))
+    else {
         return false;
     };
     serde_json::from_str::<IdentityResponse>(&body)
@@ -205,20 +205,9 @@ fn probe_identity(daemon: &Daemon) -> bool {
 /// Verify the exact public service and version published by a known prior
 /// daemon without sending any capability from its private discovery record.
 pub fn published_identity_reachable(daemon: &PublishedDaemon) -> bool {
-    let Some(url) = health_url_for(&daemon.url, IDENTITY_PATH) else {
-        return false;
-    };
-    let Ok(mut response) = local_agent()
-        .get(&url)
-        .header("Accept", "application/json")
-        .call()
+    let Some(body) =
+        health_url_for(&daemon.url, IDENTITY_PATH).and_then(|url| public_identity_body(&url))
     else {
-        return false;
-    };
-    if response.status().as_u16() != 200 {
-        return false;
-    }
-    let Ok(body) = response.body_mut().read_to_string() else {
         return false;
     };
 
@@ -234,13 +223,10 @@ pub fn published_identity_reachable(daemon: &PublishedDaemon) -> bool {
                 })
             })
         }
-        // An earlier stacked protocol-2 preview used the same two-field
-        // identity as protocols 3 through 9. Record shape disambiguates it.
-        2 => serde_json::from_str::<LegacyIdentityResponse>(&body).is_ok_and(|actual| {
-            actual.service == HEALTH_SERVICE && actual.protocol_version == daemon.protocol_version
-        }),
         // Protocols 3 through 9 shipped the original two-field public identity.
-        3..=9 => serde_json::from_str::<LegacyIdentityResponse>(&body).is_ok_and(|actual| {
+        // An earlier stacked protocol-2 preview used the same shape; the
+        // record's lack of an instance id is what disambiguates it above.
+        2..=9 => serde_json::from_str::<LegacyIdentityResponse>(&body).is_ok_and(|actual| {
             actual.service == HEALTH_SERVICE && actual.protocol_version == daemon.protocol_version
         }),
         _ => false,
@@ -540,11 +526,7 @@ pub fn read() -> Option<Daemon> {
         || published.pid == 0
         || !is_random_id(&published.instance_id)
         || !is_random_id(&published.token)
-        || loopback_base(&published.url)?
-            .strip_prefix("http://127.0.0.1:")?
-            .parse::<u16>()
-            .ok()?
-            != published.port
+        || published_loopback_port(&published.url)? != published.port
     {
         return None;
     }
@@ -568,12 +550,6 @@ pub fn read_published_at(path: &Path) -> Option<PublishedDaemon> {
     parse_published(&body)
 }
 
-/// Confirm that the bounded discovery record still has the exact bytes that
-/// produced this metadata. The digest prevents secrets from crossing the API.
-pub fn published_record_unchanged(published: &PublishedDaemon) -> bool {
-    published_record_unchanged_at(&discovery_path(), published)
-}
-
 /// Path-specific form used by the verified handoff and its isolated tests.
 pub fn published_record_unchanged_at(path: &Path, published: &PublishedDaemon) -> bool {
     read_bounded_discovery_at(path)
@@ -582,7 +558,8 @@ pub fn published_record_unchanged_at(path: &Path, published: &PublishedDaemon) -
         == Some(published)
 }
 
-fn known_protocol(protocol_version: u32) -> bool {
+/// Whether a published record is from this protocol or one it knows how to retire.
+pub fn known_protocol(protocol_version: u32) -> bool {
     (1..=PROTOCOL_VERSION).contains(&protocol_version)
 }
 
