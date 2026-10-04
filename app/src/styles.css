@@ -957,11 +957,12 @@ body.settings-page {
 .format-toolbar::-webkit-scrollbar { display: none; }
 /* Bottom placement: flex order moves the bar below the document in the
    scrolling page, and sticky pins it to the bottom edge instead of the top. */
+/* The bottom edge has no title bar to sit under, so it gets more air. */
 :root[data-toolbar="bottom"] .format-toolbar {
   order: 1;
   top: auto;
-  bottom: 8px;
-  margin: 0 auto 8px;
+  bottom: 20px;
+  margin: 0 auto 20px;
 }
 
 .format-select,
