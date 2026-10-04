@@ -31,7 +31,7 @@ type AiSupportController = {
 
 /**
  * Own the document window's AI sidebar: built-in chat when a provider key
- * exists, otherwise a pointer to Settings. Provider keys and connected apps
+ * exists, otherwise a pointer to Settings. Provider keys and connections
  * are configured in Settings; this only reads whether a key exists, never the
  * key itself. Visibility and width belong to the shared side panel.
  */

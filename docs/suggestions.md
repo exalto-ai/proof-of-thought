@@ -17,7 +17,7 @@ the same document returns the first proposal.
 
 ## Connecting a reviewer
 
-Connected apps in Settings creates a separately scoped reviewer credential, then shows setup for
+Connections in Settings creates a separately scoped reviewer credential, then shows setup for
 the selected client:
 
 - ChatGPT desktop: add a STDIO server under Settings → MCP servers, then restart and check `/mcp`.

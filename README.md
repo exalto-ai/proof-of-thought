@@ -69,7 +69,7 @@ connection's separate credential from an owner-only file and never prints it. It
 published daemon or starts one when discovery is stale. Process-lifetime locks decide which
 daemon may publish and open SQLite; file presence and PIDs do not.
 
-Connected apps in Settings (⌘,) sets up ChatGPT desktop, Codex, Claude Desktop, and Claude Code
+Connections in Settings (⌘,) sets up ChatGPT desktop, Codex, Claude Desktop, and Claude Code
 as reviewers. Each saved connection gets its own credential, scoped to all documents or to one, and
 sees only read and suggestion tools. Their last-used time and reported model are status
 hints, not verified identity or live presence.

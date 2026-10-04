@@ -953,8 +953,8 @@ editor width that neither drag can take. The daemon pushes no list changes, so a
 new document appears when this window regains focus rather than immediately.
 
 Configuration lives in one app-wide Settings window (Proof of Thought → Settings…, ⌘,), laid
-out like a Mac app's Settings with General, Chat, and Connected Apps toolbar tabs (⌘1–⌘3):
-appearance, provider keys for built-in chat, and connected apps. The sidebar only asks whether a
+out like a Mac app's Settings with General, Chat, and Connections toolbar tabs (⌘1–⌘3):
+appearance, provider keys for built-in chat, and connections to reviewer apps. The sidebar only asks whether a
 provider key exists; with none it points to Settings, and with exactly one it selects that
 provider. There are no AI modes and no first-launch chooser. Connected reviewer proposals and
 built-in chat wording both use the existing Accept/Reject suggestion flow by default. A connected

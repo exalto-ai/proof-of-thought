@@ -46,8 +46,8 @@ const reason = (error: unknown) => oneLine(error, "unknown error");
 // ---------------------------------------------------------------- tabs
 
 /**
- * Toolbar tabs, as in a Mac app's Settings window: one pane at a time, the
- * window titled after it, and the last pane remembered.
+ * Toolbar tabs, as in a Mac app's Settings window: one pane at a time and
+ * the last pane remembered. The window stays titled "Settings".
  */
 const SETTINGS_TAB_STORAGE_KEY = "thought.settings-tab.v1";
 const tabs = [...document.querySelectorAll<HTMLButtonElement>('.settings-tabs [role="tab"]')];
@@ -68,8 +68,6 @@ function selectTab(pane: string, focus = false) {
   }
   if (focus) chosen.focus();
   writeItem(storage, SETTINGS_TAB_STORAGE_KEY, chosen.dataset.pane ?? "general");
-  document.title = chosen.textContent?.trim() || "Settings";
-  void nativeWindow?.setTitle(document.title);
 }
 
 for (const [index, tab] of tabs.entries()) {
@@ -183,7 +181,7 @@ installProProvider(document, {
   onNotice: notify,
 });
 
-// ---------------------------------------------------------------- connected apps
+// ---------------------------------------------------------------- connections
 
 const scope = required<HTMLSelectElement>(document, "#reviewer-scope", "settings");
 const documentField = required<HTMLElement>(document, "#reviewer-document-field", "settings");
@@ -233,7 +231,7 @@ new MutationObserver(renderDocumentField).observe(
 
 async function connectReviewers() {
   if (!isTauri()) {
-    notify("Open Settings through the native app to manage connected apps.", "error");
+    notify("Open Settings through the native app to manage connections.", "error");
     return;
   }
   try {
