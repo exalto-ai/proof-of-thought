@@ -65,3 +65,35 @@ fn provider_chat_can_create_only_a_pending_reported_suggestion() {
     let unchanged = daemon.read_document(doc_id);
     assert_eq!(unchanged["markdown"], "Original text");
 }
+
+#[test]
+fn chatgpt_plan_chat_creates_a_reported_suggestion_too() {
+    let daemon = Daemon::start();
+    let created = daemon.editor_post(
+        "/editor/documents",
+        serde_json::json!({ "title": "Draft", "markdown": "Original text" }),
+    );
+    let doc_id = created["doc_id"].as_str().unwrap();
+    let lineage = daemon
+        .connect()
+        .call("document_lineage", serde_json::json!({ "doc_id": doc_id }));
+    let wording_revision = lineage["current_wording_revision"].as_str().unwrap();
+
+    let outcome = daemon.editor_post(
+        &format!("/editor/documents/{doc_id}/suggestions/pro-chat"),
+        serde_json::json!({
+            "request_id": "chat-request-plan",
+            "provider": "chatgpt",
+            "requested_model": "gpt-plan",
+            "assistant_text": "A haiku",
+            "wording_revision": wording_revision,
+            "after": { "kind": "end" }
+        }),
+    );
+
+    assert_eq!(outcome["suggestion"]["state"], "pending");
+    assert_eq!(
+        outcome["suggestion"]["proposer"]["label"],
+        "ChatGPT chat (reported)"
+    );
+}

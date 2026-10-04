@@ -539,11 +539,13 @@ export function installProChat(
       const suggest = root.createElement("button");
       suggest.type = "button";
       suggest.className = "text-button pro-chat-suggest";
+      // Lands as a suggestion in the note, to accept or reject there.
       suggest.textContent = message.suggested
-        ? "Suggested"
+        ? "Suggested in note"
         : suggesting === message
-          ? "Suggesting…"
-          : "Suggest in document";
+          ? "Adding…"
+          : "Add to Note";
+      suggest.title = "Add this to the note as a suggestion to accept or reject";
       suggest.disabled = message.suggested === true || loadingModels || suggesting !== null ||
         pendingText !== null || readingAttachments;
       suggest.addEventListener("click", () => void suggestMessage(message));

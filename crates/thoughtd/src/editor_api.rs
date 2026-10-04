@@ -6,8 +6,7 @@ use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use std::sync::Arc;
 use thought_mcp::{
-    ActorRef, MutationContext, ReviewerAccess, ReviewerClient, ReviewerProvider, SuggestedChange,
-    Workspace,
+    ActorRef, MutationContext, ReviewerAccess, ReviewerClient, SuggestedChange, Workspace,
 };
 use thoughtd::connections::{ConnectionRegistry, now_ms};
 
@@ -29,11 +28,22 @@ struct SetDeleted {
     deleted: bool,
 }
 
+/// Who answered in built-in chat: an API key's provider, or the user's
+/// ChatGPT plan. Separate from `ReviewerProvider`, which belongs to saved
+/// reviewer connections.
+#[derive(serde::Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+enum ChatProvider {
+    Openai,
+    Anthropic,
+    Chatgpt,
+}
+
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CreateChatSuggestion {
     request_id: String,
-    provider: ReviewerProvider,
+    provider: ChatProvider,
     requested_model: String,
     #[serde(default)]
     reported_model: Option<String>,
@@ -212,8 +222,9 @@ async fn create_chat_suggestion(
         ChatSuggestionPosition::Block { block_id } => Some(block_id),
     };
     let (provider_id, provider_label) = match request.provider {
-        ReviewerProvider::Openai => ("openai", "OpenAI"),
-        ReviewerProvider::Anthropic => ("anthropic", "Anthropic"),
+        ChatProvider::Openai => ("openai", "OpenAI"),
+        ChatProvider::Anthropic => ("anthropic", "Anthropic"),
+        ChatProvider::Chatgpt => ("chatgpt", "ChatGPT"),
     };
     let connection_id = format!("pro-chat:{provider_id}");
     let model = request
