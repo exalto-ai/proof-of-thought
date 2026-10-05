@@ -20,7 +20,7 @@
 import type { Editor } from "@tiptap/core";
 import type * as Y from "yjs";
 import type { BlockAttribution } from "./mcp";
-import { colorFor, seedFrom } from "./names";
+import { actorDisplayName, colorFor, seedFrom } from "./names";
 
 /**
  * A block's id, as the daemon spells it.
@@ -124,7 +124,11 @@ function ago(timestamp: number): string {
  * only "you" there would erase where the words came from.
  */
 export function labelFor(block: BlockAttribution, selfId: string): string {
-  const who = block.touched_by === selfId ? "You" : block.display_name || block.touched_by;
+  const who = block.touched_by === selfId
+    ? "You"
+    : block.display_name
+      ? actorDisplayName(block.display_name, block.touched_by.includes(":pro-chat:"))
+      : block.touched_by;
   const model = block.touched_by !== selfId && block.model ? ` · ${block.model}` : "";
   const drafted =
     block.created_by !== block.touched_by

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { colorFor, playfulName, seedFrom } from "./names";
+import { actorDisplayName, colorFor, playfulName, seedFrom } from "./names";
 
 describe("playful names", () => {
   it("is stable for the same peer", () => {
@@ -40,5 +40,15 @@ describe("playful names", () => {
   it("derives a seed from a string for actors named by id", () => {
     expect(seedFrom("agent:opus")).toBe(seedFrom("agent:opus"));
     expect(seedFrom("agent:opus")).not.toBe(seedFrom("agent:sonnet"));
+  });
+});
+
+describe("actor display names", () => {
+  it("drops the reported marker, and chat for the built-in chat", () => {
+    expect(actorDisplayName("ChatGPT chat (reported)", true)).toBe("ChatGPT");
+    expect(actorDisplayName("Suggestion from Anthropic chat (reported)", true)).toBe("Anthropic");
+    expect(actorDisplayName("Codex (reported)", false)).toBe("Codex");
+    expect(actorDisplayName("Team chat", false)).toBe("Team chat");
+    expect(actorDisplayName(" (reported)", false)).toBe("AI");
   });
 });

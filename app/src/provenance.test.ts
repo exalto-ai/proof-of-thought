@@ -183,6 +183,11 @@ describe("labels", () => {
 
   it("does not claim a draft credit when one actor did both", () => {
     expect(labelFor(attribution(), "human:editor")).not.toContain("drafted by");
+    expect(labelFor(attribution({
+      touched_by: "reviewer:pro-chat:chatgpt",
+      display_name: "ChatGPT chat (reported)",
+      model: "gpt-6-astra",
+    }), "human:editor")).toMatch(/^ChatGPT · gpt-6-astra · /);
   });
 });
 

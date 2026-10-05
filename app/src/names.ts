@@ -57,3 +57,16 @@ export function seedFrom(text: string): number {
   }
   return hash >>> 0;
 }
+
+/**
+ * How an actor's name reads in the window: "ChatGPT chat (reported)" or
+ * "Suggestion from ChatGPT chat (reported)" as "ChatGPT". The "(reported)"
+ * marker records that the name is a claim; the places that show it say so
+ * once rather than on every label. Built-in chat (`pro-chat`) drops "chat",
+ * which only says where the request came from.
+ */
+export function actorDisplayName(label: string, builtInChat: boolean): string {
+  let name = label.replace(/^Suggestion from /, "").replace(/\s*\(reported\)$/, "").trim();
+  if (builtInChat) name = name.replace(/\s+chat$/i, "");
+  return name || "AI";
+}
