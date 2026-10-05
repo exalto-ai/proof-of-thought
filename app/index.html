@@ -81,15 +81,17 @@
               </div>
               <textarea id="pro-chat-input" maxlength="16384" rows="2" placeholder="Ask about this note…"></textarea>
               <div class="pro-chat-composer-bar">
-                <span class="chatgpt-indicator" id="pro-chat-plan" role="img" aria-label="Using ChatGPT plan" title="Using ChatGPT plan" hidden><span class="chatgpt-logo" aria-hidden="true"></span></span>
-                <label class="pro-chat-picker"><span class="sr-only">Model</span>
-                  <select id="pro-chat-model" aria-label="Model" disabled></select>
-                </label>
+                <button class="icon-action" id="pro-chat-attach" type="button" title="Attach files" aria-label="Attach files" data-icon="paperclip"></button>
+                <input id="pro-chat-attachment-input" type="file" accept="application/pdf,text/*,.pdf,.txt,.md,.markdown,.csv,.json,.html,.htm,.log,.xml,.yaml,.yml,.toml" multiple hidden />
                 <label class="pro-chat-picker"><span class="sr-only">Mode</span>
                   <select id="pro-chat-mode" aria-label="Mode" title="Suggest edits to review, or edit the note directly">
                     <option value="suggest">Suggest</option>
                     <option value="edit">Edit</option>
                   </select>
+                </label>
+                <span class="pro-chat-spacer"></span>
+                <label class="pro-chat-picker"><span class="sr-only">Model</span>
+                  <select id="pro-chat-model" aria-label="Model" disabled></select>
                 </label>
                 <label class="pro-chat-picker"><span class="sr-only">Thinking</span>
                   <select id="pro-chat-thinking" aria-label="Thinking" title="Thinking">
@@ -99,12 +101,11 @@
                     <option value="high">High</option>
                   </select>
                 </label>
-                <span class="pro-chat-spacer"></span>
-                <button class="icon-action" id="pro-chat-attach" type="button" title="Attach files" aria-label="Attach files" data-icon="paperclip"></button>
-                <input id="pro-chat-attachment-input" type="file" accept="application/pdf,text/*,.pdf,.txt,.md,.markdown,.csv,.json,.html,.htm,.log,.xml,.yaml,.yml,.toml" multiple hidden />
                 <button class="pro-chat-send" id="pro-chat-send" type="submit" title="Send" aria-label="Send" data-icon="arrowUp" disabled></button>
               </div>
             </div>
+            <!-- OpenAI asks plan usage to say so near the composer or model menu. -->
+            <p class="pro-chat-plan-note" id="pro-chat-plan" hidden>Using ChatGPT plan</p>
           </form>
         </section>
 
