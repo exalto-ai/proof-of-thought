@@ -37,6 +37,7 @@ type AiSupportOptions = {
 type AiSupportController = {
   setCurrentDocument(context: ProChatDocument | null): void;
   setSuggestionStates(states: ReadonlyMap<string, string>): void;
+  refreshChatFocus(): void;
   destroy(): void;
 };
 
@@ -170,6 +171,9 @@ export function installAiSupport(
     },
     setSuggestionStates(states) {
       chat.setSuggestionStates(states);
+    },
+    refreshChatFocus() {
+      chat.refreshFocus();
     },
     destroy() {
       for (const dispose of disposers.splice(0)) dispose();

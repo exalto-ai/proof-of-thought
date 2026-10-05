@@ -20,6 +20,8 @@ export type SendChatRequest = {
   messages: ChatMessage[];
   message: string;
   focus_text: string | null;
+  /** The top-level blocks the selection covers, or the one the caret is in. */
+  focus_blocks: number[];
   attachments: ChatAttachment[];
   disclosure_version: 2;
 };

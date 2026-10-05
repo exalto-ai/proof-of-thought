@@ -571,9 +571,13 @@ response or a private transcript lifecycle, neither of which the MVP has a prese
 
 ### AD-25: Extra chat context is selected text or request-scoped files
 
-A person may snapshot the current editor selection as visible plain-text focus for one chat
-request. The app still sends the current document, labels the selection separately, bounds it, and
-clears it after a successful response. It is context, not a durable range or provenance claim.
+Each chat request carries the current editor selection as bounded plain text, with the top-level
+blocks it spans, or with no selection the block the caret is in. The app still sends the current
+document and labels this focus separately. A chip shows the selection and can leave it out until
+the selection changes. It is context, not a durable range or provenance claim. Amended 2026-10-05:
+this used to be a separate "Focus on selection" control, which was removed as unclear; sending the
+focus by default is what makes "rewrite this" work. The cost is that a selection left in place goes
+along unless dismissed.
 
 A chat message may also carry up to five PDFs or UTF-8 text files. PDFs are limited to 10 MiB,
 text files to 512 KiB, and the combined decoded payload to 20 MiB. The WebView checks files for

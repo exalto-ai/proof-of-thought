@@ -74,6 +74,11 @@
           <form id="pro-chat-form">
             <div class="pro-chat-composer">
               <ul id="pro-chat-attachments" hidden></ul>
+              <div class="pro-chat-focus" id="pro-chat-focus" hidden>
+                <span class="pro-chat-focus-label">Selection</span>
+                <span class="pro-chat-focus-text" id="pro-chat-focus-text"></span>
+                <button type="button" id="pro-chat-focus-clear" aria-label="Don't send the selection" title="Don't send the selection" data-icon="x"></button>
+              </div>
               <textarea id="pro-chat-input" maxlength="16384" rows="2" placeholder="Ask about this note…"></textarea>
               <div class="pro-chat-composer-bar">
                 <span class="chatgpt-indicator" id="pro-chat-plan" role="img" aria-label="Using ChatGPT plan" title="Using ChatGPT plan" hidden><span class="chatgpt-logo" aria-hidden="true"></span></span>
