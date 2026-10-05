@@ -16,7 +16,9 @@ export const PROVIDER_KEYS_CHANGED_STORAGE_KEY = "thought.provider-keys-changed"
 /** The model menu's sections, plan first. */
 const MENU_ORDER: readonly ProProvider[] = ["chatgpt", "openai", "anthropic"];
 
-export const SIDEBAR_MIN_WIDTH = 280;
+/** Wide enough for the composer's controls on one line, with the model's
+ * name at its shortest; measured, plus a margin for font metrics. */
+export const SIDEBAR_MIN_WIDTH = 340;
 export const SIDEBAR_DEFAULT_WIDTH = 360;
 export const SIDEBAR_MAX_WIDTH = 720;
 
