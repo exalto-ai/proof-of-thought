@@ -243,9 +243,16 @@ function refreshTitle(editor: Editor) {
       snapshot: () => editorSnapshot(editor),
       blockIds: () => topLevelBlockIds(editor, current.doc),
       waitUntilSaved: () => current.provider.waitUntilSaved(),
-      selectedText: () => {
-        const { from, to } = editor.state.selection;
-        return from === to ? null : editor.state.doc.textBetween(from, to, "\n", "\n");
+      focus: () => {
+        const { from, to, empty } = editor.state.selection;
+        // The top-level blocks the selection touches, or the caret's block.
+        const blocks: number[] = [];
+        editor.state.doc.forEach((node, offset, index) => {
+          const end = offset + node.nodeSize;
+          if (empty ? from > offset && from < end : offset < to && end > from) blocks.push(index);
+        });
+        const text = empty ? "" : editor.state.doc.textBetween(from, to, "\n", "\n");
+        return { text: text.trim() ? text : null, blocks };
       },
     });
   }
@@ -440,6 +447,8 @@ async function openDocument(docId: string): Promise<boolean> {
   }
 
   editor.on("update", () => refreshTitle(editor));
+  // The chat refers to what is selected, so it follows the selection.
+  editor.on("selectionUpdate", () => aiSupport.refreshChatFocus());
   editor.on("update", scheduleProvenance);
   editor.on("update", proof.scheduleRefresh);
   const stopSourceHydration = provider.subscribeHydration((hydrated) => {

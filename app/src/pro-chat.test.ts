@@ -50,6 +50,10 @@ function markup(): string {
           <option value="suggest">Suggest</option>
           <option value="edit">Edit</option>
         </select>
+        <div id="pro-chat-focus" hidden>
+          <span id="pro-chat-focus-text"></span>
+          <button id="pro-chat-focus-clear" type="button"></button>
+        </div>
         <textarea id="pro-chat-input"></textarea>
         <button id="pro-chat-send" type="submit"></button>
       </form>
@@ -64,7 +68,7 @@ function chatDocument(id = "private-document-id", title = "Draft"): ProChatDocum
     snapshot: () => ({ type: "doc", content: [] }),
     blockIds: () => [],
     waitUntilSaved: async () => true,
-    selectedText: () => null,
+    focus: () => ({ text: null, blocks: [] }),
   };
 }
 
@@ -194,7 +198,10 @@ describe("built-in chat", () => {
     };
     const controller = installChat({ bridge, createRequestId: () => "suggestion-one" });
     controller.setActive(true);
-    controller.setDocument({ ...chatDocument(), selectedText: () => "Selected line" });
+    controller.setDocument({
+      ...chatDocument(),
+      focus: () => ({ text: "Selected line", blocks: [2] }),
+    });
 
     await vi.waitFor(() => {
       expect(bridge.models).toHaveBeenCalledWith("openai");
@@ -218,7 +225,8 @@ describe("built-in chat", () => {
       document_title: "Draft",
       document: { type: "doc", content: [] },
       message: "Improve the ending",
-      focus_text: null,
+      focus_text: "Selected line",
+      focus_blocks: [2],
       thinking: "provider_default",
       attachments: [],
       disclosure_version: 2,
@@ -378,6 +386,41 @@ describe("built-in chat", () => {
     await vi.waitFor(() =>
       expect(chatStats(storage, "private-document-id")).toEqual({ replies: 1, elapsedMs: 3_500 }));
     now.mockRestore();
+    controller.destroy();
+  });
+
+  it("sends the selection unless dismissed, and otherwise the caret's block", async () => {
+    let focus: { text: string | null; blocks: number[] } = { text: "Klorem ipsum vadora", blocks: [1] };
+    const bridge = chatBridge();
+    const controller = installChat({ bridge });
+    controller.setActive(true);
+    controller.setDocument({ ...chatDocument(), focus: () => focus });
+    await chooseOpenAi(bridge);
+    const chip = document.querySelector<HTMLElement>("#pro-chat-focus")!;
+    expect(chip.hidden).toBe(false);
+    expect(chip.textContent).toContain("“Klorem ipsum vadora”");
+
+    // Dismissed: neither the text nor where it is goes along.
+    document.querySelector<HTMLButtonElement>("#pro-chat-focus-clear")!.click();
+    expect(chip.hidden).toBe(true);
+    compose("Rewrite this");
+    submitChat();
+    await vi.waitFor(() => expect(bridge.send).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(bridge.send).mock.calls[0][0]).toMatchObject({ focus_text: null, focus_blocks: [] });
+    await vi.waitFor(() => expect(document.querySelector("#pro-chat-send")).not.toBeNull());
+
+    // A new selection comes back; with none, the caret's block goes along.
+    focus = { text: "Nunc vadora", blocks: [3, 4] };
+    controller.refreshFocus();
+    expect(chip.hidden).toBe(false);
+    focus = { text: null, blocks: [5] };
+    controller.refreshFocus();
+    expect(chip.hidden).toBe(true);
+    await vi.waitFor(() => expect(document.querySelector<HTMLTextAreaElement>("#pro-chat-input")!.disabled).toBe(false));
+    compose("Add a line here");
+    submitChat();
+    await vi.waitFor(() => expect(bridge.send).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(bridge.send).mock.calls[1][0]).toMatchObject({ focus_text: null, focus_blocks: [5] });
     controller.destroy();
   });
 

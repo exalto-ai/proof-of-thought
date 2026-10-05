@@ -38,6 +38,8 @@ const MAX_PERSISTED_IDENTIFIER_BYTES = 512;
 const MAX_SUGGESTION_METADATA_BYTES = 160;
 const MAX_SUGGESTION_REQUEST_ID_BYTES = 128;
 const MAX_CHANGES = 20;
+const MAX_FOCUS_BYTES = 32 * 1024;
+const FOCUS_PREVIEW_CHARS = 48;
 const MAX_PREVIEW_CHARS = 80;
 const STORAGE_PREFIX = "thought.pro-chat.v1.";
 /** Per note, whether chat edits apply directly. Absent means Suggest. */
@@ -51,6 +53,9 @@ const TEXT_MEDIA_TYPES = new Set([
   "application/yaml",
 ]);
 
+/** Where the person is in the note: selected text, and the blocks it spans or the caret's block. */
+export type ChatFocus = { text: string | null; blocks: number[] };
+
 export type ProChatDocument = {
   id: string;
   title: string;
@@ -58,7 +63,7 @@ export type ProChatDocument = {
   /** Each top-level block's id, in the snapshot's order; null if not saved yet. */
   blockIds(): Array<string | null>;
   waitUntilSaved(): Promise<boolean>;
-  selectedText(): string | null;
+  focus(): ChatFocus;
 };
 
 type ChatStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -146,6 +151,8 @@ export type ProChatController = {
   /** The providers with a key or sign-in, in menu order. */
   setProviders(providers: readonly ProProvider[]): void;
   setDocument(document: ProChatDocument | null): void;
+  /** The editor's selection moved: update what the next message will refer to. */
+  refreshFocus(): void;
   /** Which suggestions in the open note are still pending, by id. */
   setSuggestionStates(states: ReadonlyMap<string, string>): void;
   destroy(): void;
@@ -522,6 +529,9 @@ export function installProChat(
   const modelSelect = required<HTMLSelectElement>(panel, "#pro-chat-model", "chat");
   const thinkingSelect = required<HTMLSelectElement>(panel, "#pro-chat-thinking", "chat");
   const modeSelect = panel.querySelector<HTMLSelectElement>("#pro-chat-mode");
+  const focusChip = panel.querySelector<HTMLElement>("#pro-chat-focus");
+  const focusLabel = panel.querySelector<HTMLElement>("#pro-chat-focus-text");
+  const focusClear = panel.querySelector<HTMLButtonElement>("#pro-chat-focus-clear");
   const retry = required<HTMLButtonElement>(panel, "#pro-chat-retry", "chat");
   const storageNotice = required<HTMLElement>(panel, "#pro-chat-storage-notice", "chat");
   const documentLabel = required<HTMLElement>(panel, "#pro-chat-document", "chat");
@@ -543,6 +553,8 @@ export function installProChat(
   let messages: LocalMessage[] = [];
   let stagedAttachments: StagedAttachment[] = [];
   let pendingText: string | null = null;
+  /** A selection the person chose not to send; a new selection replaces it. */
+  let dismissedFocus: string | null = null;
   let suggestionStates: ReadonlyMap<string, string> = new Map();
   /** The reply as it streams in, while `pendingText` is out. */
   let pendingReply: { text: string; edits: ChatEdit["kind"][]; applying: boolean } | null = null;
@@ -780,6 +792,21 @@ export function installProChat(
     return item;
   }
 
+  /** The composer's note of the selection that will go with the next message. */
+  function renderFocus(): void {
+    if (!focusChip || !focusLabel) return;
+    const text = currentDocument?.focus().text ?? null;
+    if (text !== dismissedFocus) dismissedFocus = null;
+    const shown = text !== null && dismissedFocus === null;
+    focusChip.hidden = !shown;
+    if (!shown) return;
+    const line = text.replace(/\s+/g, " ").trim();
+    focusLabel.textContent = line.length > FOCUS_PREVIEW_CHARS
+      ? `“${line.slice(0, FOCUS_PREVIEW_CHARS).trimEnd()}…”`
+      : `“${line}”`;
+    focusChip.title = line.slice(0, 400);
+  }
+
   function renderMessages(): void {
     const rendered = messages.map((message) => messageElement(message));
     if (pendingText !== null) {
@@ -848,6 +875,7 @@ export function installProChat(
   }
 
   function render(): void {
+    renderFocus();
     renderMessages();
     renderAttachments();
     renderMenu();
@@ -1085,6 +1113,15 @@ export function installProChat(
     const snapshot = document.snapshot();
     const blockIds = document.blockIds();
     const mode = currentMode();
+    // The selection goes along unless it was dismissed; with none, the caret's
+    // block does. Too large a selection still names its blocks.
+    const focus = document.focus();
+    const selected = focus.text !== null && focus.text !== dismissedFocus ? focus.text : null;
+    const focusText = selected !== null &&
+        new TextEncoder().encode(selected).byteLength <= MAX_FOCUS_BYTES
+      ? selected
+      : null;
+    const focusBlocks = focus.text !== null && selected === null ? [] : focus.blocks;
     const generation = ++requestGeneration;
     const previous = messages.map(({ role, text }) => ({ role, text }));
     const requestAttachments: ChatAttachment[] = stagedAttachments.map((attachment) => ({
@@ -1118,7 +1155,8 @@ export function installProChat(
         thinking: selectedThinking,
         messages: previous,
         message,
-        focus_text: null,
+        focus_text: focusText,
+        focus_blocks: focusBlocks,
         attachments: requestAttachments,
         disclosure_version: 2,
       }, onProgress);
@@ -1261,6 +1299,14 @@ export function installProChat(
     return [...changes.values()];
   }
 
+  if (focusClear) {
+    listen(focusClear, "click", () => {
+      dismissedFocus = currentDocument?.focus().text ?? null;
+      renderFocus();
+      input.focus();
+    });
+  }
+
   if (modeSelect) {
     listen(modeSelect, "change", () => {
       if (currentDocument) saveMode(currentDocument.id, currentMode());
@@ -1355,6 +1401,9 @@ export function installProChat(
       ensureSelection();
       render();
       if (active) void loadModels();
+    },
+    refreshFocus() {
+      renderFocus();
     },
     setSuggestionStates(states) {
       suggestionStates = states;

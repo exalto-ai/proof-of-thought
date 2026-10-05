@@ -1,10 +1,14 @@
 # Chat focus and attachments
 
-**Removed from the composer:** a "Focus on selection" control used to capture the editor selection
-as a separate plain-text focus for one request. Its purpose was unclear in use, so the window no
-longer offers it and always sends `focus_text: null`. The native request still accepts and bounds
-an optional focus, labelled separately from the full current document, should a clearer control
-return; it would be a snapshot, not a live range, with no verified provenance.
+Each message carries where the person is in the note. With text selected, it sends that text,
+bounded to 32 KiB, and the top-level blocks it spans. With only a caret, it sends the caret's block.
+The model reads these as `selected_focus` and `cursor`, so "rewrite this" or "add a line here"
+resolve without quoting. The editor keeps drawing the selection, in grey, while focus is in the
+chat, so it is clear what will go along.
+
+A chip above the composer shows the selection. Its × leaves the selection, and where it is, out of
+the next messages until the selection changes. The focus is a snapshot taken at Send, not a live
+range, and carries no verified provenance.
 
 The same composer may attach PDFs and UTF-8 text files for one request. The app sends their bytes
 inline after validating them in both the WebView and native boundary. It never sends a filesystem
