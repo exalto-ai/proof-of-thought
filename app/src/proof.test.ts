@@ -10,8 +10,8 @@ import {
 } from "./proof";
 
 function lineage(revision = "revision-a"): DocumentLineage {
-  const group = (label: string, ingress: string, amount: number) => ({
-    group: { key: label, label, ingress: ingress as never, assurance: "observed", alignment: "exact" },
+  const group = (label: string, ingress: string, amount: number, key = label) => ({
+    group: { key, label, ingress: ingress as never, assurance: "observed", alignment: "exact" },
     event_count: 1,
     graphemes: amount,
     non_whitespace_graphemes: amount,
@@ -26,8 +26,8 @@ function lineage(revision = "revision-a"): DocumentLineage {
       grouped_contributions: [
         group("Written here", "entered", 20),
         group("Edited here", "command", 5),
-        group("Suggestion from ChatGPT chat (reported)", "suggestion", 60),
-        group("ChatGPT chat (reported)", "api", 10),
+        group("Suggestion from ChatGPT chat (reported)", "suggestion", 60, "suggestion:connection:pro-chat:chatgpt"),
+        group("ChatGPT chat (reported)", "api", 10, "chat:connection:pro-chat:chatgpt"),
         group("Pasted", "pasted", 5),
       ],
     },
@@ -67,7 +67,7 @@ function sources(overrides: Partial<ProofSources> = {}): ProofSources {
 describe("proof numbers", () => {
   it("merges sources into slices a reader recognizes", () => {
     expect(shareSlices(lineage())).toEqual([
-      { label: "ChatGPT chat", amount: 70, machine: true },
+      { label: "ChatGPT", amount: 70, machine: true },
       { label: "You", amount: 25, machine: false },
       { label: "Pasted", amount: 5, machine: false },
     ]);

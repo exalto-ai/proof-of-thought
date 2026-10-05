@@ -20,6 +20,7 @@ import {
   type ChartConfiguration,
 } from "chart.js";
 import type { DocumentLineage, LineageIngress } from "./mcp";
+import { actorDisplayName } from "./names";
 import { oneLine } from "./notices";
 
 Chart.register(
@@ -59,10 +60,6 @@ export type ShareSlice = { label: string; amount: number; machine: boolean };
 const HUMAN_INGRESS: ReadonlySet<LineageIngress> = new Set(["entered", "command"]);
 const MACHINE_INGRESS: ReadonlySet<LineageIngress> = new Set(["mcp", "api", "suggestion"]);
 
-/** "Suggestion from ChatGPT chat (reported)" → "ChatGPT chat". */
-function machineLabel(label: string): string {
-  return label.replace(/^Suggestion from /, "").replace(/\s*\(reported\)$/, "").trim() || "AI";
-}
 
 /** The current text by source, merged into the slices a reader cares about. */
 export function shareSlices(lineage: DocumentLineage): ShareSlice[] {
@@ -72,7 +69,7 @@ export function shareSlices(lineage: DocumentLineage): ShareSlice[] {
     const ingress = group.ingress as LineageIngress;
     const machine = MACHINE_INGRESS.has(ingress);
     const label = machine
-      ? machineLabel(group.label)
+      ? actorDisplayName(group.label, group.key.includes(":pro-chat:"))
       : HUMAN_INGRESS.has(ingress)
         ? "You"
         : ingress === "pasted"
