@@ -11,6 +11,7 @@ import type { Transform } from "@tiptap/pm/transform";
 import { extensions } from "./schema";
 import type { SyncProvider } from "./provider";
 import { FindExtension, installFind } from "./find";
+import { InactiveSelection } from "./inactive-selection";
 import { installLinkShortcut } from "./link";
 import { installSlashMenu } from "./slash";
 import { installToolbar } from "./toolbar";
@@ -122,6 +123,7 @@ export function createEditor(
       editorMutationExtension(provider),
       ...extensions,
       FindExtension,
+      InactiveSelection,
       // The fragment name must match the daemon's root (thought_core::CONTENT).
       Collaboration.configure({ fragment: doc.getXmlFragment("content") }),
       CollaborationCaret.configure({
