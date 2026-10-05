@@ -594,16 +594,17 @@ button.pro-chat-change:focus-visible {
   gap: 2px;
   min-width: 0;
 }
-/* In a narrow sidebar the model's name shortens first; past that the row
-   wraps rather than pushing Attach or Send out of view or cutting the short
-   menus down to a letter. */
+/* Attach and the mode on the left; the model, thinking, and Send on the
+   right. Each menu is as wide as its chosen label, never its longest
+   option; in a narrow sidebar the model's name shortens first, and past
+   that the row wraps rather than pushing Send out of view. */
 .pro-chat-composer-bar > :not(.pro-chat-spacer) { flex: none; }
 .pro-chat-spacer { flex: 1 1 0; min-width: 0; }
-/* The model, mode, and thinking menus: native pop-ups, drawn quietly. */
 .pro-chat-picker { display: flex; min-width: 0; }
 .pro-chat-picker:has(#pro-chat-model) { flex: 0 1 auto; min-width: 72px; max-width: 150px; }
 .pro-chat-picker select {
-  width: 100%;
+  field-sizing: content;
+  max-width: 100%;
   min-width: 0;
   text-overflow: ellipsis;
   height: 24px;
@@ -652,6 +653,15 @@ button.pro-chat-change:focus-visible {
 .pro-chat-send svg { stroke-width: 2.2; }
 .pro-chat-send:disabled { background: color-mix(in srgb, var(--ink) 14%, transparent); color: var(--paper); }
 .pro-chat-send[data-pending="true"] { opacity: 0.6; }
+/* "Using ChatGPT plan", as OpenAI asks, under the model menu. */
+.pro-chat-plan-note {
+  margin: 4px 6px 0 0;
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-align: right;
+}
+.pro-chat-plan-note[hidden] { display: none; }
+
 /* The selection the next message will refer to. */
 .pro-chat-focus {
   display: flex;
@@ -817,16 +827,6 @@ button.pro-chat-change:focus-visible {
 }
 .settings button.chatgpt-button:hover:not(:disabled) { background: #222; }
 .settings button.chatgpt-button[hidden] { display: none; }
-/* "Using ChatGPT plan", as OpenAI asks: the logo beside the model menu. */
-.chatgpt-indicator {
-  display: inline-grid;
-  place-items: center;
-  width: 20px;
-  height: 24px;
-  color: var(--ink-soft);
-}
-.chatgpt-indicator[hidden] { display: none; }
-.chatgpt-indicator .chatgpt-logo { width: 12px; height: 12px; }
 .settings-subsection { margin-top: 26px !important; }
 
 .modal-backdrop {
