@@ -16,10 +16,11 @@ rerun may replace assets only while the GitHub release is still a draft; the wor
 mutate a published release.
 
 Apple credentials must be environment secrets in a protected GitHub environment named `release`,
-not repository-wide Actions secrets. Require reviewer approval, prevent self-review, restrict the
-environment to protected `v*` tags and manual runs from `main`, and restrict creation or movement of
-`v*` tags to release maintainers. The approver must compare the displayed tag and commit with the
-intended release.
+not repository-wide Actions secrets. Require reviewer approval, restrict the environment to `v*`
+tags and manual runs from `main`, and restrict creation, movement, or deletion of `v*` tags to
+release maintainers (the "Release tags" ruleset, which only repository admins bypass). Prevent
+self-review once there is more than one maintainer; with a single maintainer it would block every
+release. The approver must compare the displayed tag and commit with the intended release.
 
 The protected macOS build, signing, and verification job has read-only repository permission, and
 its checkouts never persist a GitHub token. It hands one verified DMG and checksum file to a
@@ -69,7 +70,11 @@ had to be created for Proof of Thought:
 - `Exalto - Apple Signing` → *Apple Developer ID - Exalto (3FGNZ9DY9Y)*
 - `Exalto - LLM Notary` → *App Store Connect API - LLM Notary Notarization*
 
-Set them straight from the vault, so the values never land in a file, a
+`scripts/set-release-secrets.sh` sets all seven from the vault, plus the repository's
+`CLAUDE_CODE_OAUTH_TOKEN` for the review workflows (from `claude setup-token`). It prints secret
+names only. The certificate is the item's `PKCS12` file attachment.
+
+To set one by hand, pipe it straight from the vault, so the value never lands in a file, a
 clipboard, or shell history:
 
 ```bash
