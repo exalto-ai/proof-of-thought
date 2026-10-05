@@ -589,14 +589,23 @@ button.pro-chat-change:focus-visible {
 }
 .pro-chat-composer-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
+  min-width: 0;
 }
-.pro-chat-spacer { flex: 1; }
-/* The model and thinking menus: native pop-ups, drawn quietly. */
-.pro-chat-picker { min-width: 0; }
+/* In a narrow sidebar the model's name shortens first; past that the row
+   wraps rather than pushing Attach or Send out of view or cutting the short
+   menus down to a letter. */
+.pro-chat-composer-bar > :not(.pro-chat-spacer) { flex: none; }
+.pro-chat-spacer { flex: 1 1 0; min-width: 0; }
+/* The model, mode, and thinking menus: native pop-ups, drawn quietly. */
+.pro-chat-picker { display: flex; min-width: 0; }
+.pro-chat-picker:has(#pro-chat-model) { flex: 0 1 auto; min-width: 72px; max-width: 150px; }
 .pro-chat-picker select {
-  max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
   height: 24px;
   padding: 0 4px;
   border: 0;
@@ -608,7 +617,6 @@ button.pro-chat-change:focus-visible {
 }
 .pro-chat-picker select:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); }
 .pro-chat-picker select:focus-visible { outline: 2px solid var(--accent); }
-.pro-chat-picker:first-child select { max-width: 150px; }
 .icon-action,
 .pro-chat-send {
   display: inline-grid;
