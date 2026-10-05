@@ -1201,6 +1201,20 @@ body.settings-page {
   letter-spacing: -0.035em;
 }
 
+/* The selection or caret while focus is elsewhere, such as the chat: grey,
+   as a Mac app draws an inactive selection. */
+.tiptap .inactive-selection { background: color-mix(in srgb, var(--ink) 14%, transparent); border-radius: 2px; }
+.tiptap .inactive-caret { position: relative; }
+.tiptap .inactive-caret::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 0.15em;
+  height: 1.25em;
+  border-left: 2px solid color-mix(in srgb, var(--ink) 45%, transparent);
+  pointer-events: none;
+}
+
 /* ---------- find (⌘F) ---------- */
 .find-bar {
   position: absolute;
