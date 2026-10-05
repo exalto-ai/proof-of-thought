@@ -589,15 +589,14 @@ button.pro-chat-change:focus-visible {
 }
 .pro-chat-composer-bar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   min-width: 0;
 }
 /* Attach and the mode on the left; the model, thinking, and Send on the
-   right. Each menu is as wide as its chosen label, never its longest
-   option; in a narrow sidebar the model's name shortens first, and past
-   that the row wraps rather than pushing Send out of view. */
+   right, on one line. Each menu is as wide as its chosen label, never its
+   longest option; in a narrow sidebar only the model's name shortens, and
+   the sidebar's minimum width (SIDEBAR_MIN_WIDTH) keeps the rest whole. */
 .pro-chat-composer-bar > :not(.pro-chat-spacer) { flex: none; }
 .pro-chat-spacer { flex: 1 1 0; min-width: 0; }
 .pro-chat-picker { display: flex; min-width: 0; }
