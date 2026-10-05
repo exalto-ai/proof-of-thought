@@ -730,21 +730,26 @@ button.pro-chat-change:focus-visible {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 10px 16px 14px;
+  padding: 18px 20px 22px;
   overflow-y: auto;
   font-size: 12px;
 }
-/* Centred in the pane when it fits; scrolls from the top when it does not. */
+/* Whichever is showing, the numbers or a status line, sits in the middle of
+   the pane when it fits and scrolls from the top when it does not. The
+   status line and the content are never shown together. */
 .proof > * { flex: none; }
-.proof > :first-child { margin-top: auto; }
-.proof > :last-child { margin-bottom: auto; }
-.proof-status { margin: 0 0 8px; color: var(--ink-soft); }
+.proof > .proof-status { margin-top: auto; text-align: center; }
+.proof > .proof-status:has(+ #proof-retry[hidden]) { margin-bottom: auto; }
+.proof > #proof-retry { align-self: center; margin: 6px 0 auto; }
+.proof-body { display: grid; gap: 22px; margin-block: auto; }
+.proof-body[hidden] { display: none; }
+.proof-status { margin: 0; color: var(--ink-soft); }
 .proof-chart { position: relative; }
-.proof-share { height: 150px; }
-.proof-activity { height: 140px; margin-top: 14px; }
+.proof-share { height: 160px; }
+.proof-activity { height: 140px; }
 .proof canvas[hidden] { display: none; }
-.proof-stats { margin: 10px 0 0; }
-.proof-stats .settings-row { min-height: 0; padding: 7px 0; }
+.proof-stats { margin: 0; }
+.proof-stats .settings-row { min-height: 0; padding: 8px 0; }
 .proof-stats dt { color: var(--ink-soft); }
 .proof-stats dd { margin: 0; text-align: right; }
 
