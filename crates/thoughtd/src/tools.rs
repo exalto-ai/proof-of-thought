@@ -8,6 +8,7 @@
 use axum::http::request::Parts;
 use rmcp::handler::server::tool::Extension;
 use rmcp::handler::server::wrapper::{Json, Parameters};
+use rmcp::model::JsonObject;
 use rmcp::{ErrorData, tool, tool_router};
 use std::sync::Arc;
 use thought_core::Position;
@@ -41,6 +42,16 @@ fn failed(e: impl std::fmt::Display) -> ErrorData {
     let message = e.to_string();
     tracing::warn!(error = %message, "tool call failed");
     ErrorData::internal_error(message, None)
+}
+
+/// Every tool result is a JSON object, and its output schema must say so: MCP
+/// clients reject a `tools/list` whose `outputSchema` lacks `type: "object"`,
+/// which a `Json<serde_json::Value>` return does not declare.
+fn object(value: impl serde::Serialize) -> Result<Json<JsonObject>, ErrorData> {
+    match serde_json::to_value(value).map_err(failed)? {
+        serde_json::Value::Object(object) => Ok(Json(object)),
+        other => Err(failed(format!("tool result is not a JSON object: {other}"))),
+    }
 }
 
 fn denied(error: impl std::fmt::Display) -> ErrorData {
@@ -321,13 +332,13 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<ListParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         let (_, authorized) = self.authorize(&parts, ReviewerOperation::Read, None)?;
         let docs = self
             .workspace
             .list_documents_scoped(p.limit, p.trashed, authorized.selected_document())
             .map_err(failed)?;
-        Ok(Json(serde_json::json!({ "documents": docs })))
+        object(serde_json::json!({ "documents": docs }))
     }
 
     #[tool(
@@ -339,10 +350,10 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<DocParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         self.authorize(&parts, ReviewerOperation::Read, Some(&p.doc_id))?;
         let view = self.workspace.read_document(&p.doc_id).map_err(failed)?;
-        Ok(Json(serde_json::to_value(view).map_err(failed)?))
+        object(view)
     }
 
     #[tool(description = "List reviewer suggestions for one document and their current state.")]
@@ -350,10 +361,10 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<DocParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         self.authorize(&parts, ReviewerOperation::Read, Some(&p.doc_id))?;
         let suggestions = self.workspace.list_suggestions(&p.doc_id).map_err(failed)?;
-        Ok(Json(serde_json::to_value(suggestions).map_err(failed)?))
+        object(suggestions)
     }
 
     #[tool(
@@ -363,7 +374,7 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<SuggestParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         let (principal, authorized) =
             self.authorize(&parts, ReviewerOperation::Suggest, Some(&p.doc_id))?;
         let connection_id = authorized
@@ -394,7 +405,7 @@ impl Thought {
                 group,
             )
             .map_err(failed)?;
-        Ok(Json(serde_json::to_value(outcome).map_err(failed)?))
+        object(outcome)
     }
 
     #[tool(
@@ -405,10 +416,10 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<DocParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         self.authorize(&parts, ReviewerOperation::Read, Some(&p.doc_id))?;
         let actors = self.workspace.document_actors(&p.doc_id).map_err(failed)?;
-        Ok(Json(serde_json::json!({ "actors": actors })))
+        object(serde_json::json!({ "actors": actors }))
     }
 
     #[tool(
@@ -422,10 +433,10 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<DocParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         self.authorize(&parts, ReviewerOperation::Read, Some(&p.doc_id))?;
         let blocks = self.workspace.block_provenance(&p.doc_id).map_err(failed)?;
-        Ok(Json(serde_json::json!({ "blocks": blocks })))
+        object(serde_json::json!({ "blocks": blocks }))
     }
 
     #[tool(
@@ -438,10 +449,10 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<DocParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         self.authorize(&parts, ReviewerOperation::Read, Some(&p.doc_id))?;
         let lineage = self.workspace.document_lineage(&p.doc_id).map_err(failed)?;
-        Ok(Json(serde_json::to_value(lineage).map_err(failed)?))
+        object(lineage)
     }
 
     #[tool(description = "Full-text search across documents.")]
@@ -449,13 +460,13 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<SearchParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         let (_, authorized) = self.authorize(&parts, ReviewerOperation::Read, None)?;
         let hits = self
             .workspace
             .search_scoped(&p.query, p.limit, authorized.selected_document())
             .map_err(failed)?;
-        Ok(Json(serde_json::json!({ "hits": hits })))
+        object(serde_json::json!({ "hits": hits }))
     }
 
     #[tool(
@@ -466,7 +477,7 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<CreateParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         let (principal, authorized) = self.authorize(&parts, ReviewerOperation::Create, None)?;
         let (actor, context) = self.mutation_identity(&principal, &authorized, &p.caller)?;
         let view = match p.initial_markdown {
@@ -478,7 +489,7 @@ impl Thought {
                 .create_document_with_context(&p.title, &actor, &context),
         }
         .map_err(failed)?;
-        Ok(Json(serde_json::to_value(view).map_err(failed)?))
+        object(view)
     }
 
     #[tool(description = "Replace one block's content with markdown.")]
@@ -486,7 +497,7 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<ReplaceBlockParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         let (principal, authorized) =
             self.authorize(&parts, ReviewerOperation::Edit, Some(&p.doc_id))?;
         let (actor, context) = self.mutation_identity(&principal, &authorized, &p.caller)?;
@@ -501,7 +512,7 @@ impl Thought {
                 &context,
             )
             .map_err(failed)?;
-        Ok(Json(serde_json::to_value(out).map_err(failed)?))
+        object(out)
     }
 
     #[tool(description = "Insert new blocks after a block, or at the start or end.")]
@@ -509,7 +520,7 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<InsertBlocksParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         let position = match p.after.as_deref() {
             None | Some("end") => Position::End,
             Some("start") => Position::Start,
@@ -529,7 +540,7 @@ impl Thought {
                 &context,
             )
             .map_err(failed)?;
-        Ok(Json(serde_json::to_value(out).map_err(failed)?))
+        object(out)
     }
 
     #[tool(
@@ -541,7 +552,7 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<ReplaceTextParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         let (principal, authorized) =
             self.authorize(&parts, ReviewerOperation::Edit, Some(&p.doc_id))?;
         let (actor, context) = self.mutation_identity(&principal, &authorized, &p.caller)?;
@@ -560,7 +571,7 @@ impl Thought {
                 &context,
             )
             .map_err(failed)?;
-        Ok(Json(serde_json::to_value(out).map_err(failed)?))
+        object(out)
     }
 
     #[tool(
@@ -571,7 +582,7 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<DeleteDocumentParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         let (principal, authorized) =
             self.authorize(&parts, ReviewerOperation::Trash, Some(&p.doc_id))?;
         let (actor, context) = self.mutation_identity(&principal, &authorized, &p.caller)?;
@@ -579,7 +590,7 @@ impl Thought {
             .workspace
             .set_document_deleted_with_context(&p.doc_id, p.deleted, &actor, &context)
             .map_err(failed)?;
-        Ok(Json(serde_json::to_value(out).map_err(failed)?))
+        object(out)
     }
 
     #[tool(description = "Delete a block.")]
@@ -587,7 +598,7 @@ impl Thought {
         &self,
         Extension(parts): Extension<Parts>,
         Parameters(p): Parameters<DeleteBlockParams>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<JsonObject>, ErrorData> {
         let (principal, authorized) =
             self.authorize(&parts, ReviewerOperation::Edit, Some(&p.doc_id))?;
         let (actor, context) = self.mutation_identity(&principal, &authorized, &p.caller)?;
@@ -601,7 +612,7 @@ impl Thought {
                 &context,
             )
             .map_err(failed)?;
-        Ok(Json(serde_json::to_value(out).map_err(failed)?))
+        object(out)
     }
 }
 
@@ -638,6 +649,21 @@ impl rmcp::ServerHandler for Thought {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_output_schema_declares_an_object_root() {
+        for tool in Thought::tool_router().list_all() {
+            let schema = tool
+                .output_schema
+                .expect("every tool returns structured content");
+            assert_eq!(
+                schema.get("type"),
+                Some(&serde_json::json!("object")),
+                "{} has an output schema clients will reject",
+                tool.name
+            );
+        }
+    }
 
     #[test]
     fn reviewer_groups_are_optional_and_scoped_to_the_connection() {
